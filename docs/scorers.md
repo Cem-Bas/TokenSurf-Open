@@ -292,11 +292,11 @@ Embeddings come from one of two places:
 - If the injected `client` has an `embed()` method (the `EmbeddingClient` Protocol:
   `embed(*, model: str, texts: list[str]) -> list[list[float]]`), it is used.
 - Otherwise `litellm.embedding` is called (lazy import). If litellm is not importable, the
-  score errors, pointing you at the optional extra.
+  score errors with a clear message.
 
-The package declares a `reference` extra (`tokensurf[reference]`, which adds `numpy>=1.26`) for
-the embedding stack; litellm itself is a core dependency. The scorer is always importable — only
-`score()` can fail, and failures come back as errored results, never exceptions.
+`litellm` is a core dependency, so embeddings work out of the box — no optional extra is needed.
+The scorer is always importable; only `score()` can fail, and failures come back as errored
+results, never exceptions.
 
 ```python
 ts.EmbeddingSimilarity(threshold=0.85)   # needs case.expected on each case

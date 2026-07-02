@@ -74,6 +74,11 @@ class SlidingWindowLimiter:
         while dq and dq[0] <= cutoff:
             dq.popleft()
 
+    def clear(self) -> None:
+        """Forget all recorded events (used to isolate the per-process limiter in tests)."""
+        with self._lock:
+            self._buckets.clear()
+
     # ------------------------------------------------------------------
     # Public API
     # ------------------------------------------------------------------

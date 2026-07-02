@@ -342,3 +342,25 @@ def test_post_login_with_valid_csrf_succeeds(client, seeded) -> None:
     resp = _login(client)
     assert resp.status_code == 303
     assert resp.headers["location"] == "/"
+
+
+def test_login_rate_limited_returns_429(client, seeded, monkeypatch) -> None:
+    """After the per-client login limit is exceeded, POST /login returns 429 + Retry-After."""
+    from tokensurf_server.ratelimit import SlidingWindowLimiter
+    from tokensurf_server.web import routes
+
+    monkeypatch.setattr(routes, "_login_limiter", SlidingWindowLimiter(2, 60))
+    # 2 attempts (wrong password -> 401) are allowed...
+    for _ in range(2):
+        r = client.post(
+            "/login",
+            data={"email": "admin@example.com", "password": "nope", "csrf_token": _csrf(client)},
+        )
+        assert r.status_code == 401
+    # ...the 3rd is throttled before the credential check.
+    r = client.post(
+        "/login",
+        data={"email": "admin@example.com", "password": "nope", "csrf_token": _csrf(client)},
+    )
+    assert r.status_code == 429
+    assert "retry-after" in {k.lower() for k in r.headers}

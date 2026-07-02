@@ -58,3 +58,19 @@ def db_session(engine):
     session.close()
     transaction.rollback()
     connection.close()
+
+
+@pytest.fixture(autouse=True)
+def _reset_rate_limiters():
+    """Clear the per-process rate limiters before each test.
+
+    The login and config limiters are module-level singletons keyed by client IP /
+    project id. Without a reset the many logins across the suite (all from the same
+    TestClient IP) would exhaust the login bucket and spuriously 429 later tests.
+    """
+    from tokensurf_server import ingest
+    from tokensurf_server.web import routes
+
+    routes._login_limiter.clear()
+    ingest._config_limiter.clear()
+    yield
