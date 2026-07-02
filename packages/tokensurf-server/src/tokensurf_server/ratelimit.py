@@ -63,6 +63,10 @@ class SlidingWindowLimiter:
         self._clock = clock
         self._lock = threading.Lock()
         self._buckets: dict[str, deque[float]] = {}
+        # Reclaim stale keys periodically so an attacker rotating source keys
+        # (e.g. IPv6 addresses) can't grow _buckets without bound.
+        self._ops = 0
+        self._sweep_every = 1024
 
     # ------------------------------------------------------------------
     # Internal helpers
@@ -73,6 +77,19 @@ class SlidingWindowLimiter:
         cutoff = now - self._window
         while dq and dq[0] <= cutoff:
             dq.popleft()
+
+    def _sweep(self, now: float) -> None:
+        """Evict expired timestamps everywhere and drop keys that are now empty."""
+        for key in list(self._buckets):
+            dq = self._buckets[key]
+            self._evict(dq, now)
+            if not dq:
+                del self._buckets[key]
+
+    def clear(self) -> None:
+        """Forget all recorded events (used to isolate the per-process limiter in tests)."""
+        with self._lock:
+            self._buckets.clear()
 
     # ------------------------------------------------------------------
     # Public API
@@ -89,11 +106,16 @@ class SlidingWindowLimiter:
 
         now = self._clock()
         with self._lock:
+            self._ops += 1
+            if self._ops % self._sweep_every == 0:
+                self._sweep(now)
             dq = self._buckets.setdefault(key, deque())
             self._evict(dq, now)
             if len(dq) < self._max:
                 dq.append(now)
                 return True
+            # Bucket is at capacity — keep it (it still holds live timestamps);
+            # empty buckets are reclaimed by the periodic sweep above.
             return False
 
     def retry_after(self, key: str) -> int:
@@ -111,6 +133,9 @@ class SlidingWindowLimiter:
             if dq is None:
                 return 0
             self._evict(dq, now)
+            if not dq:
+                del self._buckets[key]
+                return 0
             if len(dq) < self._max:
                 return 0
             oldest = dq[0]

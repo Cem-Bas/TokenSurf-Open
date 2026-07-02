@@ -24,6 +24,7 @@ from tokensurf_server.config import get_settings
 from tokensurf_server.crypto import encrypt
 from tokensurf_server.db import get_session
 from tokensurf_server.models import NotificationChannel, Project, QualityGate, User
+from tokensurf_server.ratelimit import SlidingWindowLimiter, parse_rate
 from tokensurf_server.security import hash_password, verify_password
 from tokensurf_server.web.charts import distribution_bars, trend_svg
 from tokensurf_server.web.csrf import CSRF_COOKIE
@@ -42,6 +43,14 @@ log = logging.getLogger(__name__)
 
 router = APIRouter()
 templates = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
+
+# Brute-force throttles for POST /login. One keyed on client IP (blocks a single noisy
+# source) and one keyed on the submitted account (blocks a distributed guess against one
+# email even when the attacker rotates source IPs). Captured at import like the config
+# limiter; tests reset both via the _reset_rate_limiters conftest fixture.
+_login_count, _login_window = parse_rate(get_settings().login_rate_limit)
+_login_limiter = SlidingWindowLimiter(_login_count, _login_window)
+_login_email_limiter = SlidingWindowLimiter(_login_count, _login_window)
 
 # Precomputed once so login does the same PBKDF2 work whether or not the email
 # exists — closing the timing oracle that would otherwise enumerate valid emails.
@@ -87,6 +96,22 @@ def post_login(
     # Guard against login CSRF (an attacker forcing a victim into an attacker-chosen
     # session). The CsrfMiddleware issues the ts_csrf cookie + token on GET /login.
     _require_csrf(request, csrf_token)
+    # Throttle password brute-force per client IP AND per account. (Behind a proxy the IP
+    # key is the proxy IP unless trusted-proxy handling is enabled — see docs/security.md.)
+    client_ip = request.client.host if request.client else "unknown"
+    email_key = email.strip().lower()
+    ip_ok = _login_limiter.allow(client_ip)
+    email_ok = _login_email_limiter.allow(email_key)
+    if not (ip_ok and email_ok):
+        retry = max(
+            _login_limiter.retry_after(client_ip),
+            _login_email_limiter.retry_after(email_key),
+        )
+        raise HTTPException(
+            status_code=429,
+            detail="Too many login attempts",
+            headers={"Retry-After": str(retry)},
+        )
     user = session.scalar(select(User).where(User.email == email))
     expected_hash = user.password_hash if user is not None else _DUMMY_PASSWORD_HASH
     password_ok = verify_password(password, expected_hash)

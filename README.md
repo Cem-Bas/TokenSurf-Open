@@ -48,7 +48,7 @@ scorers: list[ts.Scorer] = [ts.ExactMatch(), ts.ToolSequence(expected=["lookup"]
 uv run tokensurf eval run eval.py    # console table + results.jsonl
 ```
 
-Add `--server https://your-tokensurf --key tsk_...` to push the run to your server. Full
+Add `--server https://tokensurf.example.com --key tsk_...` to push the run to your server. Full
 walkthrough, including the pytest gate: [Quickstart](docs/quickstart.md).
 
 ## Self-hosting the server

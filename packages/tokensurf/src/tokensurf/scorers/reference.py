@@ -44,8 +44,8 @@ class EmbeddingSimilarity(Scorer):
             import litellm
         except ImportError as exc:  # pragma: no cover - optional 'reference' extra
             raise RuntimeError(
-                "EmbeddingSimilarity needs the 'reference' extra (litellm embeddings) "
-                "or an injected client with an embed() method"
+                "EmbeddingSimilarity needs litellm (a bundled dependency) "
+                "or an injected client with an embed() method; litellm import failed"
             ) from exc
         resp = litellm.embedding(model=self.model, input=texts)
         return [item["embedding"] for item in resp["data"]]

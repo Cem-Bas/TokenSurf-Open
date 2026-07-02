@@ -35,6 +35,15 @@ class Settings(BaseSettings):
     # local HTTP development works; set to true in any TLS-terminated deployment.
     secure_cookies: bool = Field(default=False, validation_alias="TOKENSURF_SECURE_COOKIES")
 
+    # Per-client rate limit for POST /login as "count/window_seconds" (brute-force throttle).
+    login_rate_limit: str = Field(default="10/60", validation_alias="TOKENSURF_LOGIN_RATE_LIMIT")
+
+    # When true, notification webhooks may not target private/loopback/reserved addresses.
+    # Link-local (cloud-metadata) targets are always refused regardless of this flag.
+    webhook_block_private: bool = Field(
+        default=False, validation_alias="TOKENSURF_BLOCK_PRIVATE_WEBHOOKS"
+    )
+
     # SMTP settings for email notifications (all optional)
     smtp_host: str | None = Field(default=None, validation_alias="TOKENSURF_SMTP_HOST")
     smtp_port: int = Field(default=587, validation_alias="TOKENSURF_SMTP_PORT")

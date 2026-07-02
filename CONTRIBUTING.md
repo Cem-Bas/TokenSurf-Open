@@ -58,10 +58,10 @@ uv sync
 ```
 
 `uv sync` resolves the whole workspace into a shared `.venv` at the repo root. To include a
-package's optional extras (e.g. `numpy` for `EmbeddingSimilarity`, `httpx` for push):
+package's optional extras (e.g. `httpx` for push):
 
 ```bash
-uv sync --directory packages/tokensurf --extra reference --extra push
+uv sync --directory packages/tokensurf --extra push
 ```
 
 ## Running tests
