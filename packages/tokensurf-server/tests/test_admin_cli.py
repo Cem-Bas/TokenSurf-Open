@@ -31,6 +31,8 @@ def _patch_db_url(monkeypatch):
 @pytest.fixture(scope="module")
 def test_engine():
     """Engine pointing at the test DB with all tables created."""
+    import subprocess
+
     from sqlalchemy import create_engine
 
     from tokensurf_server.db import Base
@@ -41,6 +43,12 @@ def test_engine():
     except ModuleNotFoundError:
         pass
     Base.metadata.create_all(engine)
+    # create_all bypasses Alembic's version tracking, so the DB ends up with every
+    # table but no alembic_version row. Stamp it to head — the schema really is at
+    # head at this point — so test_migrate_runs_without_error's `alembic upgrade
+    # head` sees a consistent state instead of trying (and failing) to re-create
+    # tables that already exist.
+    subprocess.run(["alembic", "stamp", "head"], check=True)
     yield engine
     engine.dispose()
 
