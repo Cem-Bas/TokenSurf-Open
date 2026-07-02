@@ -61,7 +61,7 @@ uv sync
 package's optional extras (e.g. `httpx` for push):
 
 ```bash
-uv sync --directory packages/tokensurf --extra reference --extra push
+uv sync --directory packages/tokensurf --extra push
 ```
 
 ## Running tests

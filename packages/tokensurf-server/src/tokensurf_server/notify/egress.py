@@ -6,14 +6,20 @@ internal service or a cloud metadata endpoint. This module refuses the most dang
 targets before the server ever makes the request.
 
 Policy:
-- Link-local addresses (169.254.0.0/16, fe80::/10 — the cloud-metadata range) are ALWAYS
-  refused. They are never a legitimate webhook target.
-- Loopback / private / reserved / multicast / unspecified addresses are refused only when
-  ``block_private`` is set (env ``TOKENSURF_BLOCK_PRIVATE_WEBHOOKS``), because self-hosters
-  legitimately POST to internal endpoints on their own network.
-- A literal-IP host is checked directly (no DNS). A hostname is resolved and every
-  resolved address is checked only when ``block_private`` is set; otherwise a hostname is
-  allowed without a DNS lookup, preserving current behavior by default.
+- IP-LITERAL targets are always checked, in any common encoding: canonical dotted
+  (``169.254.169.254``), bare integer (``2852039166``), dotted hex/octal
+  (``0xA9.0xFE.0xA9.0xFE``), a trailing dot, and IPv4-mapped IPv6 (``::ffff:169.254.169.254``)
+  are all normalized to the underlying address. Link-local addresses (169.254.0.0/16,
+  fe80::/10 — the cloud-metadata range) are refused for such literals regardless of
+  ``block_private``; loopback / private / reserved / multicast are refused only when
+  ``block_private`` is set.
+- HOSTNAME targets are resolved and checked (all resolved addresses) ONLY when
+  ``block_private`` is set (env ``TOKENSURF_BLOCK_PRIVATE_WEBHOOKS``). By default a
+  hostname is allowed without a DNS lookup — so a hostname that resolves to an internal
+  address is NOT caught in the default configuration. Operators who need that protection
+  should set ``TOKENSURF_BLOCK_PRIVATE_WEBHOOKS=true`` and/or run the server on an
+  egress-restricted network. Note: even with resolution, ``httpx`` re-resolves the host
+  when it connects, so DNS rebinding is only fully mitigated by a network egress control.
 """
 
 from __future__ import annotations
@@ -22,14 +28,38 @@ import ipaddress
 import socket
 from urllib.parse import urlparse
 
+IPAddress = ipaddress.IPv4Address | ipaddress.IPv6Address
+
 
 class WebhookURLBlocked(ValueError):
     """Raised when a notification target URL is refused by the egress policy."""
 
 
-def _classify_blocked(
-    ip: ipaddress.IPv4Address | ipaddress.IPv6Address, *, block_private: bool
-) -> str | None:
+def _unwrap(ip: IPAddress) -> IPAddress:
+    """Unwrap an IPv4-mapped IPv6 address to the underlying IPv4 address."""
+    if isinstance(ip, ipaddress.IPv6Address) and ip.ipv4_mapped is not None:
+        return ip.ipv4_mapped
+    return ip
+
+
+def _literal_ip(host: str) -> IPAddress | None:
+    """Return the address a literal host encodes (any common form), or None for a hostname."""
+    h = host.rstrip(".")
+    for parse in (
+        lambda: ipaddress.ip_address(h),
+        lambda: ipaddress.ip_address(int(h)) if h.isdigit() else None,
+        lambda: ipaddress.ip_address(socket.inet_aton(h)),  # dotted hex/octal/short forms
+    ):
+        try:
+            ip = parse()
+        except (ValueError, OverflowError, OSError):
+            ip = None
+        if ip is not None:
+            return _unwrap(ip)
+    return None
+
+
+def _classify_blocked(ip: IPAddress, *, block_private: bool) -> str | None:
     """Return a reason string if the address is blocked, else None."""
     if ip.is_link_local:
         return "link-local / cloud-metadata address"
@@ -49,18 +79,14 @@ def check_webhook_url(url: str, *, block_private: bool = False) -> None:
     if not host:
         raise WebhookURLBlocked("URL has no host")
 
-    # Literal IP host: check directly, no DNS.
-    try:
-        ip = ipaddress.ip_address(host)
-    except ValueError:
-        ip = None
+    ip = _literal_ip(host)
     if ip is not None:
         reason = _classify_blocked(ip, block_private=block_private)
         if reason:
             raise WebhookURLBlocked(f"refused webhook target ({reason})")
         return
 
-    # Hostname: only resolve + check when strict mode is on (avoids DNS by default).
+    # Real hostname: only resolve + check in strict mode (keeps the default path DNS-free).
     if not block_private:
         return
     try:
@@ -68,8 +94,7 @@ def check_webhook_url(url: str, *, block_private: bool = False) -> None:
     except OSError as exc:
         raise WebhookURLBlocked(f"could not resolve webhook host {host!r}") from exc
     for info in infos:
-        addr = info[4][0]
-        resolved = ipaddress.ip_address(addr)
+        resolved = _unwrap(ipaddress.ip_address(info[4][0]))
         reason = _classify_blocked(resolved, block_private=block_private)
         if reason:
-            raise WebhookURLBlocked(f"refused webhook target {host!r} -> {addr} ({reason})")
+            raise WebhookURLBlocked(f"refused webhook target {host!r} -> {resolved} ({reason})")

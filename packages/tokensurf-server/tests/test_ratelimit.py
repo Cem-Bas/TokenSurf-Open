@@ -145,3 +145,22 @@ def test_parse_rate_zero_window_rejected() -> None:
         parse_rate("5/0")
     with pytest.raises(ValueError):
         parse_rate("5/-1")
+
+
+def test_stale_keys_are_reclaimed():
+    """The periodic sweep drops keys whose events have all expired (no unbounded growth)."""
+    from tokensurf_server.ratelimit import SlidingWindowLimiter
+
+    clock = [0.0]
+    lim = SlidingWindowLimiter(1, 10, clock=lambda: clock[0])
+    lim._sweep_every = 4  # sweep often so the test is fast
+    for i in range(10):
+        lim.allow(f"ip{i}")  # 10 distinct keys recorded at t=0
+    assert len(lim._buckets) == 10
+
+    clock[0] = 100.0  # advance well past the 10s window
+    for _ in range(4):  # trigger a sweep
+        lim.allow("trigger")
+
+    assert "ip0" not in lim._buckets, "expired keys must be reclaimed"
+    assert len(lim._buckets) <= 1  # only the live 'trigger' key remains

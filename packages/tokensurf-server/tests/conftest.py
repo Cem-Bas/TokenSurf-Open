@@ -72,5 +72,6 @@ def _reset_rate_limiters():
     from tokensurf_server.web import routes
 
     routes._login_limiter.clear()
+    routes._login_email_limiter.clear()
     ingest._config_limiter.clear()
     yield

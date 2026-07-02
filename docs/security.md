@@ -29,6 +29,8 @@ Swagger UI at `/api/docs`, and its schema at `/openapi.json`.
 | `TOKENSURF_SESSION_SECRET` | insecure built-in default | Signs session cookies and CSRF tokens. Startup fails unless it is changed and is at least 32 characters. |
 | `TOKENSURF_SECRET_KEY` | unset | Passphrase from which the Fernet encryption key for stored secrets is derived. |
 | `TOKENSURF_CONFIG_RATE_LIMIT` | `30/60` | Rate limit for `GET /api/v1/config` as `count/window_seconds`. `0/...` disables. |
+| `TOKENSURF_LOGIN_RATE_LIMIT` | `10/60` | Brute-force throttle for `POST /login` (per client IP and per account) as `count/window_seconds`. `0/...` disables. |
+| `TOKENSURF_BLOCK_PRIVATE_WEBHOOKS` | `false` | When true, notification webhooks may not target loopback/private/reserved addresses (link-local/metadata literals are refused regardless). See Notification egress below. |
 | `TOKENSURF_ALLOW_INSECURE_SESSION_SECRET` | unset | Local/test-only bypass of the session-secret guard. Only `1`, `true`, `yes`, or `on` count as set. |
 | `TOKENSURF_SECURE_COOKIES` | `false` | When true, sets the `Secure` flag on the session and CSRF cookies (requires HTTPS). Turn it on in any TLS-terminated deployment. |
 | `DATABASE_URL` | required | Postgres connection URL. Missing value fails loudly at startup. |
@@ -182,20 +184,27 @@ still relies only on same-origin cookie access, so it does not weaken the creden
 
 ## Rate limiting
 
-`GET /api/v1/config` is throttled by an in-process, thread-safe sliding-window limiter (stdlib
-only — no new dependencies), keyed by project id. The window is configured by
-`TOKENSURF_CONFIG_RATE_LIMIT` as `count/window_seconds`; a count of 0 or below disables it. When
-the limit is exceeded the endpoint returns 429 with `Retry-After` set to the seconds until the
-oldest in-window request expires. The limit spec is read once at process import.
+Two endpoints are throttled in-app by a thread-safe sliding-window limiter (stdlib only). Both
+return 429 with a `Retry-After` header when exceeded, and both read their spec at process import.
+
+- **`GET /api/v1/config`** — keyed by project id, `TOKENSURF_CONFIG_RATE_LIMIT` (default `30/60`).
+- **`POST /login`** — throttled by BOTH the client IP and the submitted account, using
+  `TOKENSURF_LOGIN_RATE_LIMIT` (default `10/60`). The per-account key means a distributed guess
+  against one email (an attacker rotating source IPs) is still throttled, not just a single noisy
+  IP. `0/...` disables it. The throttle runs after the CSRF check and before the credential check.
 
 Caveats you must plan for:
 
-- The limiter is **per process** and resets on restart. Running multiple uvicorn workers
+- The limiters are **per process** and reset on restart. Running multiple uvicorn workers
   multiplies the effective limit by the worker count. In multi-worker deployments, enforce an
   additional rate limit at your gateway or reverse proxy.
-- Only the config endpoint is limited in-app. `POST /login` (password guessing) and Bearer-key
-  lookups on the other `/api/v1/*` routes are not throttled by the app — put gateway limits in
-  front of them.
+- **Behind a reverse proxy, the login limiter keys on the proxy's IP** unless you enable
+  trusted-proxy handling (uvicorn `--proxy-headers` with `--forwarded-allow-ips`, or equivalent).
+  Without it, all clients share one IP bucket — the per-account key still protects individual
+  accounts, but co-located legitimate users can transiently throttle each other. Enable
+  trusted-proxy handling so `request.client.host` reflects the real client.
+- Bearer-key lookups on the other `/api/v1/*` routes are not throttled by the app — put gateway
+  limits in front of them.
 
 ## Audit log
 
@@ -245,10 +254,12 @@ beyond localhost:
   per-process config limiter in multi-worker setups.
 - **Notification egress (SSRF surface)**: notification channels POST to an admin-configured URL
   (Slack / webhook), and the test-send and gate-failure paths make the server issue that request.
-  Only trusted admins can create channels (there is no self-registration), but the target URL is not
-  restricted to public addresses — a malicious or careless admin could point it at an internal host
-  or cloud metadata endpoint. Run the server on an egress-restricted network (or behind a forward
-  proxy with an allow-list) if that matters in your environment.
+  Only trusted admins can create channels (there is no self-registration). By default the server
+  refuses IP-literal targets in the link-local / cloud-metadata range (169.254.0.0/16, fe80::/10) in
+  any encoding, but it does NOT resolve hostnames — a hostname pointing at an internal address is
+  allowed. Set `TOKENSURF_BLOCK_PRIVATE_WEBHOOKS=true` to resolve every target and also refuse
+  loopback/private/reserved addresses. Because `httpx` re-resolves on connect, DNS rebinding is only
+  fully mitigated by running the server on an egress-restricted network (or a forward proxy allow-list).
 - **Client IP in the audit log**: `config.pull` records `request.client.host`. Behind a reverse
   proxy every pull is attributed to the proxy's IP unless you enable trusted-proxy handling
   (uvicorn `--proxy-headers` with `--forwarded-allow-ips`, or an equivalent). Do not trust

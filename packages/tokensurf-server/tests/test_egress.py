@@ -39,3 +39,19 @@ def test_hostname_not_resolved_by_default():
     # A hostname that would never resolve must still pass when block_private is off
     # (proves no DNS lookup happens on the default path).
     check_webhook_url("https://nonexistent.invalid.example/services/abc")
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "http://2852039166/latest/meta-data/",  # bare-integer 169.254.169.254
+        "http://0xA9.0xFE.0xA9.0xFE/",  # dotted hex
+        "http://0251.0376.0251.0376/",  # dotted octal
+        "http://169.254.169.254./",  # trailing dot
+        "http://[::ffff:169.254.169.254]/",  # IPv4-mapped IPv6
+    ],
+)
+def test_metadata_ip_disguises_blocked_by_default(url):
+    """Non-canonical encodings of the cloud-metadata IP are still refused (no DNS)."""
+    with pytest.raises(WebhookURLBlocked):
+        check_webhook_url(url)
