@@ -1,0 +1,54 @@
+# docker-compose.yml — convenience dev stack: Postgres + TokenSurf Server.
+#
+# Quick start:
+#   docker compose up
+#   # Server is at http://localhost:8000
+#   # Postgres is at localhost:5432
+#
+# ⚠  DEV PLACEHOLDER CREDENTIALS below — change every "changeme" value
+#    before any non-local or production use.
+#
+# To run against an existing Postgres instead:
+#   DATABASE_URL=postgresql+psycopg://user:pass@host:5432/db \
+#   uv run --directory packages/tokensurf-server uvicorn tokensurf_server.app:app
+
+services:
+  db:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: tokensurf       # change me
+      POSTGRES_PASSWORD: changeme    # change me
+      POSTGRES_DB: tokensurf
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tokensurf"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  app:
+    build:
+      context: .
+      dockerfile: packages/tokensurf-server/Dockerfile
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql+psycopg://tokensurf:changeme@db:5432/tokensurf  # change me
+      HOST: "0.0.0.0"
+      PORT: "8000"
+      # Dev-only placeholders — change both before any non-local use.
+      # The server refuses to start if the session secret is missing/short (< 32 chars).
+      TOKENSURF_SESSION_SECRET: "changeme-dev-session-secret-0123456789"  # change me
+      # Encrypts stored provider keys and notification-channel secrets at rest.
+      TOKENSURF_SECRET_KEY: "changeme-dev-encryption-passphrase"          # change me
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  postgres_data:

@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+
+# Environments / secrets
+.venv/
+.env
+
+# uv (uv.lock IS committed)
+
+# TokenSurf local artifacts
+*.sqlite
+results.jsonl
+
+# Coverage
+.coverage
+htmlcov/
+site/
+
+# Internal engineering artifacts — never publish (kept in the private planning repo)
+docs/superpowers/
+docs/design/

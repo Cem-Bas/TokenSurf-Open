@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}Docs — TokenSurf{% endblock %}
+
+{% block content %}
+<div class="page">
+  <div class="page-header">
+    <h1 class="page-title">Docs</h1>
+    <p class="page-sub">Get runs flowing into this dashboard in a few lines.</p>
+  </div>
+
+  <div class="feature-grid">
+    <div class="feature-card">
+      <div class="feature-head"><span class="scorer-pill">1 · Track</span></div>
+      <p class="feature-desc">Decorate your agent so each run is captured as a trace — framework-agnostic, and <strong>not in your data path</strong>.</p>
+      <div class="io-block">import tokensurf as ts
+
+@ts.track
+def my_agent(question):
+    ...</div>
+    </div>
+
+    <div class="feature-card">
+      <div class="feature-head"><span class="scorer-pill">2 · Score</span></div>
+      <p class="feature-desc">Define scorers and run an eval over your cases. See <a href="/scorers">Scorers</a> for the four families.</p>
+      <div class="io-block">from tokensurf import evaluate, Dataset
+from tokensurf.scorers import ExactMatch, ToolCalled
+
+report = evaluate(
+    task=my_agent,
+    data=Dataset.from_jsonl("cases.jsonl"),
+    scorers=[ExactMatch(), ToolCalled(name="kb_lookup")],
+)</div>
+    </div>
+
+    <div class="feature-card">
+      <div class="feature-head"><span class="scorer-pill">3 · Push</span></div>
+      <p class="feature-desc">Send the run to this server with your project's ingest key. It appears under <a href="/">Projects</a> and <a href="/runs">Runs</a>, and quality gates evaluate automatically.</p>
+      <div class="io-block">tokensurf eval run eval.py \
+  --server https://your-tokensurf \
+  --key ts_your_project_key</div>
+    </div>
+
+    <div class="feature-card">
+      <div class="feature-head"><span class="scorer-pill">4 · Gate &amp; alert</span></div>
+      <p class="feature-desc">In <a href="/settings">Settings</a>, add a quality gate (e.g. pass-rate ≥ 90%) and a notification channel. A run that breaches a gate shows a red chip and fires your Slack / webhook / email.</p>
+    </div>
+  </div>
+</div>
+{% endblock %}

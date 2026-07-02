@@ -1,0 +1,108 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: packages/tokensurf
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.11"
+          enable-cache: true
+
+      - name: Sync dependencies
+        run: uv sync
+
+      - name: Lint (ruff)
+        run: uv run ruff check .
+
+      - name: Format check (ruff)
+        run: uv run ruff format --check .
+
+      - name: Type check (pyright)
+        run: uv run pyright
+
+      - name: Tests (pytest + coverage)
+        run: uv run pytest -q --cov=tokensurf --cov-report=term-missing
+
+      - name: Run example eval (mocked judge, no network)
+        run: uv run python examples/quickstart_eval.py
+
+  server:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: packages/tokensurf-server
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: tokensurf
+          POSTGRES_PASSWORD: changeme
+          POSTGRES_DB: tokensurf
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    env:
+      DATABASE_URL: postgresql+psycopg://tokensurf:changeme@localhost:5432/tokensurf
+      # Ephemeral Postgres service container — safe to run the destructive migration
+      # test and to serve the UI with the default session secret in CI.
+      TOKENSURF_DESTRUCTIVE_DB_TESTS: "1"
+      TOKENSURF_ALLOW_INSECURE_SESSION_SECRET: "1"
+      # Test-only encryption passphrase so crypto/secrets/audit tests never depend on
+      # a per-file setdefault. Not a real secret.
+      TOKENSURF_SECRET_KEY: "ci-test-secret-key"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.11"
+          enable-cache: true
+
+      - name: Sync dependencies
+        run: uv sync
+
+      - name: Lint (ruff check)
+        run: uv run ruff check .
+
+      - name: Format check (ruff format)
+        run: uv run ruff format --check .
+
+      - name: Type check (pyright)
+        run: uv run pyright
+
+      - name: Tests (pytest)
+        run: uv run pytest -q
+
+  docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.11"
+          enable-cache: true
+
+      - name: Build docs site (strict — fails on broken links or nav)
+        run: uvx --with 'mkdocs-material>=9.5,<10' mkdocs build --strict

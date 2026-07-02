@@ -1,0 +1,140 @@
+{% extends "base.html" %}
+{% block title %}{{ overview.name }} — TokenSurf{% endblock %}
+
+{% block content %}
+<div class="page">
+  <div class="breadcrumb">
+    <a href="/">Projects</a>
+    <span>›</span>
+    <span>{{ overview.name }}</span>
+  </div>
+
+  <div class="page-header">
+    <h1 class="page-title">{{ overview.name }}</h1>
+    <p class="page-sub">
+      <span class="mono">{{ overview.slug }}</span>
+    </p>
+  </div>
+
+  {# ── Summary tiles ── #}
+  <div class="stats-grid">
+    <div class="stat-tile" style="--tile-color: var(--green)">
+      <div class="stat-label">Latest pass rate</div>
+      {% if overview.latest_pass_rate is not none %}
+        {% set pct = (overview.latest_pass_rate * 100)|round(1) %}
+        {% if overview.latest_pass_rate >= 0.75 %}
+        <div class="stat-value green">{{ pct }}%</div>
+        {% elif overview.latest_pass_rate >= 0.5 %}
+        <div class="stat-value orange">{{ pct }}%</div>
+        {% else %}
+        <div class="stat-value" style="color:var(--red)">{{ pct }}%</div>
+        {% endif %}
+      {% else %}
+        <div class="stat-value" style="color:var(--light-text)">—</div>
+      {% endif %}
+    </div>
+
+    <div class="stat-tile">
+      <div class="stat-label">Mean score (all runs)</div>
+      {% if overview.mean_score is not none %}
+      <div class="stat-value accent">{{ (overview.mean_score * 100)|round(1) }}%</div>
+      {% else %}
+      <div class="stat-value" style="color:var(--light-text)">—</div>
+      {% endif %}
+    </div>
+
+    <div class="stat-tile">
+      <div class="stat-label">Total runs</div>
+      <div class="stat-value accent">{{ overview.run_count }}</div>
+    </div>
+  </div>
+
+  {# ── Quality gates summary (shown when gate rules are configured for this project) ── #}
+  {% if gates is defined and gates %}
+  <div class="card" style="padding:1.1rem 1.35rem;margin-bottom:1.2rem">
+    <div style="font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:var(--light-text);margin-bottom:0.6rem;font-family:'Inter',sans-serif">Quality Gates</div>
+    <div style="display:flex;flex-wrap:wrap;gap:0.4rem">
+      {% for gate in gates %}
+      <span class="scorer-pill" title="{{ gate.metric }}{% if gate.scorer %} ({{ gate.scorer }}){% endif %} {{ gate.comparison }} {{ gate.threshold }}">{{ gate.name }}</span>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  {# ── Trend chart (server-rendered SVG, numbers only — safe) ── #}
+  {% if trend_svg %}
+  <div class="trend-chart">
+    <div style="font-family:'Inter',sans-serif;font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--light-text);margin-bottom:0.75rem">Pass-rate over runs</div>
+    {{ trend_svg | safe }}
+  </div>
+  {% endif %}
+
+  {# ── Run list ── #}
+  <div class="card" style="padding:0;overflow:hidden">
+    <div style="padding:1.1rem 1.35rem;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">
+      <h2 style="font-family:'Inter',sans-serif;font-size:0.95rem;font-weight:800">Runs</h2>
+      <span style="font-size:0.8rem;color:var(--light-text)">{{ overview.run_count }} total</span>
+    </div>
+
+    {% if overview.runs %}
+    <div class="table-wrapper">
+      <table>
+        <thead>
+          <tr>
+            <th>Label</th>
+            <th>Status</th>
+            <th>Pass rate</th>
+            <th>Cases</th>
+            <th>Created</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in overview.runs %}
+          <tr>
+            <td>
+              <span class="mono">
+                {% if r.label %}{{ r.label }}{% else %}<span style="color:var(--light-text)">unlabelled</span>{% endif %}
+              </span>
+            </td>
+            <td>
+              {% if r.status == "passed" %}
+              <span class="status-badge passed">passed</span>
+              {% elif r.status == "failed" %}
+              <span class="status-badge failed">failed</span>
+              {% elif r.status == "errored" %}
+              <span class="status-badge errored">errored</span>
+              {% else %}
+              <span class="status-badge running">{{ r.status }}</span>
+              {% endif %}
+            </td>
+            <td>
+              {% set pct = (r.pass_rate * 100)|round(1) %}
+              {% if r.pass_rate >= 0.75 %}
+              <span class="score-chip pass">{{ pct }}%</span>
+              {% elif r.pass_rate >= 0.5 %}
+              <span class="score-chip fail">{{ pct }}%</span>
+              {% else %}
+              <span class="score-chip errored">{{ pct }}%</span>
+              {% endif %}
+            </td>
+            <td style="color:var(--light-text);font-size:0.82rem">{{ r.n_cases }}</td>
+            <td style="color:var(--light-text);font-size:0.82rem">{{ r.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+            <td>
+              <a href="/projects/{{ overview.slug }}/runs/{{ r.run_id }}" style="font-size:0.78rem">Detail →</a>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    {% else %}
+    <div class="empty-state">
+      <h3>No runs yet</h3>
+      <p>Push a run with the TokenSurf SDK.</p>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

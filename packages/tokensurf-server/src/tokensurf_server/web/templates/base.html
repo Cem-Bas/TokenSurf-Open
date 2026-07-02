@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}TokenSurf{% endblock %}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=DM+Sans:wght@400;500;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/app.css">
+  {% block head %}{% endblock %}
+</head>
+<body>
+  <div class="app-shell{% if not user %} no-sidebar{% endif %}">
+    {% if user %}
+    {% set path = request.url.path %}
+    <aside class="sidebar">
+      <a href="/" class="sidebar-logo">Token<em>Surf</em></a>
+      <nav class="sidebar-nav">
+        <div class="nav-section">Workspace</div>
+        <a href="/" class="nav-item{% if path == '/' or path.startswith('/projects') %} active{% endif %}">
+          <span class="nav-icon">▤</span> Projects
+        </a>
+        <a href="/runs" class="nav-item{% if path == '/runs' %} active{% endif %}">
+          <span class="nav-icon">≣</span> Runs
+        </a>
+        <a href="/scorers" class="nav-item{% if path == '/scorers' %} active{% endif %}">
+          <span class="nav-icon">◆</span> Scorers
+        </a>
+        <div class="nav-section">Configuration</div>
+        <a href="/settings" class="nav-item{% if path == '/settings' or path.startswith('/settings/') %} active{% endif %}">
+          <span class="nav-icon">⚙</span> Settings
+        </a>
+        <a href="/docs" class="nav-item{% if path == '/docs' %} active{% endif %}">
+          <span class="nav-icon">❯</span> Docs
+        </a>
+      </nav>
+      <div class="sidebar-footer">
+        <div class="sidebar-user" title="{{ user.email }}">{{ user.email }}</div>
+        <form method="post" action="/logout">
+          <input type="hidden" name="csrf_token" value="{{ request.state.csrf_token if request.state is defined else '' }}">
+          <button type="submit" class="btn-logout">Sign out</button>
+        </form>
+      </div>
+    </aside>
+    {% endif %}
+    <div class="app-main">
+      <main>
+        {% block content %}{% endblock %}
+      </main>
+    </div>
+  </div>
+</body>
+</html>

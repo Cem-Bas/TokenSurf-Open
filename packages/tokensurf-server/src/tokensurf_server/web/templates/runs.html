@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+{% block title %}Runs — TokenSurf{% endblock %}
+
+{% block content %}
+<div class="page">
+  <div class="page-header">
+    <h1 class="page-title">Runs</h1>
+    <p class="page-sub">Every eval run across all projects, newest first.</p>
+  </div>
+
+  {# ── Filter bar ── #}
+  <form method="get" action="/runs" class="filter-bar">
+    <div class="filter-field">
+      <label>Project</label>
+      <select name="project" onchange="this.form.submit()">
+        <option value="">All projects</option>
+        {% for p in projects %}
+        <option value="{{ p.slug }}"{% if p.slug == sel_project %} selected{% endif %}>{{ p.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="filter-field">
+      <label>Gate status</label>
+      <select name="gate" onchange="this.form.submit()">
+        <option value=""{% if not sel_gate %} selected{% endif %}>Any</option>
+        <option value="failed"{% if sel_gate == 'failed' %} selected{% endif %}>Failed a gate</option>
+        <option value="passed"{% if sel_gate == 'passed' %} selected{% endif %}>Passed all gates</option>
+      </select>
+    </div>
+    <button type="submit" class="btn-secondary">Apply</button>
+    <span class="filter-count">{{ total }} run{% if total != 1 %}s{% endif %}</span>
+  </form>
+
+  {% if rows %}
+  <div class="card" style="padding:0;overflow:hidden">
+    <div class="table-wrapper">
+      <table>
+        <thead>
+          <tr>
+            <th>Project</th>
+            <th>Label</th>
+            <th>Pass rate</th>
+            <th>Gates</th>
+            <th>Cases</th>
+            <th>Created</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in rows %}
+          <tr>
+            <td><a href="/projects/{{ r.project_slug }}">{{ r.project_name }}</a></td>
+            <td>
+              <span class="mono">
+                {% if r.label %}{{ r.label }}{% else %}<span style="color:var(--light-text)">unlabelled</span>{% endif %}
+              </span>
+            </td>
+            <td>
+              {% set pct = (r.pass_rate * 100)|round(1) %}
+              {% if r.pass_rate >= 0.75 %}
+              <span class="score-chip pass">{{ pct }}%</span>
+              {% elif r.pass_rate >= 0.5 %}
+              <span class="score-chip fail">{{ pct }}%</span>
+              {% else %}
+              <span class="score-chip errored">{{ pct }}%</span>
+              {% endif %}
+            </td>
+            <td>
+              {% if r.gates_total == 0 %}
+              <span style="color:var(--light-text);font-size:0.82rem">—</span>
+              {% elif r.gates_failed > 0 %}
+              <span class="score-chip fail">{{ r.gates_failed }} failed</span>
+              {% else %}
+              <span class="score-chip pass">passed</span>
+              {% endif %}
+            </td>
+            <td style="color:var(--light-text);font-size:0.82rem">{{ r.n_cases }}</td>
+            <td style="color:var(--light-text);font-size:0.82rem">{{ r.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+            <td><a href="/projects/{{ r.project_slug }}/runs/{{ r.run_id }}" style="font-size:0.78rem">Detail →</a></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  {% if pages > 1 %}
+  <div class="pagination">
+    {% set qs = "&project=" ~ sel_project ~ "&gate=" ~ sel_gate %}
+    {% if page > 1 %}<a class="btn-secondary" href="/runs?page={{ page - 1 }}{{ qs }}">← Prev</a>{% endif %}
+    <span class="page-indicator">Page {{ page }} of {{ pages }}</span>
+    {% if page < pages %}<a class="btn-secondary" href="/runs?page={{ page + 1 }}{{ qs }}">Next →</a>{% endif %}
+  </div>
+  {% endif %}
+
+  {% else %}
+  <div class="empty-state">
+    <h3>No runs match</h3>
+    <p>Adjust the filters, or push a run with the TokenSurf SDK.</p>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

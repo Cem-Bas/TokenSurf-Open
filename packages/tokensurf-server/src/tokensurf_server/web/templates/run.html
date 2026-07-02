@@ -1,0 +1,181 @@
+{% extends "base.html" %}
+{% block title %}{{ detail.run.label or detail.run.run_id }} — {{ detail.project_slug }} — TokenSurf{% endblock %}
+
+{% block content %}
+<div class="page">
+  <div class="breadcrumb">
+    <a href="/">Projects</a>
+    <span>›</span>
+    <a href="/projects/{{ detail.project_slug }}">{{ detail.project_slug }}</a>
+    <span>›</span>
+    <span>{{ detail.run.label or detail.run.run_id }}</span>
+  </div>
+
+  {# ── Run header ── #}
+  <div class="page-header">
+    <h1 class="page-title">
+      {% if detail.run.label %}{{ detail.run.label }}{% else %}<span class="mono">{{ detail.run.run_id }}</span>{% endif %}
+    </h1>
+    <div style="display:flex;align-items:center;gap:0.75rem;margin-top:0.4rem;flex-wrap:wrap">
+      {% if detail.run.status == "passed" %}
+      <span class="status-badge passed">passed</span>
+      {% elif detail.run.status == "failed" %}
+      <span class="status-badge failed">failed</span>
+      {% elif detail.run.status == "errored" %}
+      <span class="status-badge errored">errored</span>
+      {% else %}
+      <span class="status-badge running">{{ detail.run.status }}</span>
+      {% endif %}
+
+      {% set pct = (detail.run.pass_rate * 100)|round(1) %}
+      {% if detail.run.pass_rate >= 0.75 %}
+      <span class="score-chip pass">{{ pct }}%</span>
+      {% elif detail.run.pass_rate >= 0.5 %}
+      <span class="score-chip fail">{{ pct }}%</span>
+      {% else %}
+      <span class="score-chip errored">{{ pct }}%</span>
+      {% endif %}
+
+      <span style="font-size:0.78rem;color:var(--light-text)">
+        {{ detail.run.n_cases }} case{% if detail.run.n_cases != 1 %}s{% endif %}
+        · {{ detail.run.created_at.strftime('%Y-%m-%d %H:%M') }}
+      </span>
+    </div>
+
+    {# ── Gate result chips (present only when gate rules were evaluated) ── #}
+    {% if detail.gate_results is defined and detail.gate_results %}
+    <div style="display:flex;flex-wrap:wrap;gap:0.4rem;margin-top:0.75rem;align-items:center">
+      <span style="font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:var(--light-text);font-family:'Inter',sans-serif;flex-shrink:0">Gates</span>
+      {% for gr in detail.gate_results %}
+        {% if gr.passed %}
+        <span class="score-chip pass">{{ gr.name }}{% if gr.actual is not none %} {{ (gr.actual * 100)|round(1) }}%{% endif %}</span>
+        {% else %}
+        <span class="score-chip fail">{{ gr.name }}{% if gr.actual is not none %} {{ (gr.actual * 100)|round(1) }}%{% endif %} / {{ (gr.threshold * 100)|round(1) }}%</span>
+        {% endif %}
+      {% endfor %}
+    </div>
+    {% endif %}
+  </div>
+
+  {# ── Per-scorer breakdown ── #}
+  {% if detail.scorer_stats %}
+  <h2 style="font-family:'Inter',sans-serif;font-size:1rem;font-weight:800;margin-bottom:1rem">Scorer breakdown</h2>
+  <div class="scorer-stat-grid">
+    {% for s in detail.scorer_stats %}
+    <div class="scorer-stat-card">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.9rem;flex-wrap:wrap;gap:0.5rem">
+        <span class="scorer-pill">{{ s.scorer }}</span>
+        {% set spct = (s.pass_rate * 100)|round(1) %}
+        {% if s.pass_rate >= 0.75 %}
+        <span class="score-chip pass">{{ spct }}%</span>
+        {% elif s.pass_rate >= 0.5 %}
+        <span class="score-chip fail">{{ spct }}%</span>
+        {% else %}
+        <span class="score-chip errored">{{ spct }}%</span>
+        {% endif %}
+      </div>
+      {# bars_html is server-rendered by charts.distribution_bars — numbers only,
+         safe to embed. It already labels each bucket (poor/fair/good/excellent),
+         so no second label row here. #}
+      {{ s.bars_html | safe }}
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  {# ── Case list ── #}
+  <h2 style="font-family:'Inter',sans-serif;font-size:1rem;font-weight:800;margin-bottom:0.85rem">Cases</h2>
+
+  {% if detail.cases %}
+  {% for case in detail.cases %}
+  <details class="case-details">
+    <summary>
+      <span class="mono" style="color:var(--light-text);font-size:0.7rem">{{ loop.index }}</span>
+      <span style="flex:1;font-size:0.82rem;font-family:'DM Sans',sans-serif;color:var(--dark);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+        {% if case.input is string %}{{ case.input[:80] }}{% else %}{{ case.input | string | truncate(80, killwords=True) }}{% endif %}
+      </span>
+      <div style="display:flex;gap:0.3rem;flex-shrink:0;flex-wrap:wrap">
+        {% for sc in case.scores %}
+          {% if sc.error %}
+          <span class="score-chip errored">{{ sc.scorer }}</span>
+          {% elif sc.passed %}
+          <span class="score-chip pass">{{ sc.scorer }}</span>
+          {% else %}
+          <span class="score-chip fail">{{ sc.scorer }}</span>
+          {% endif %}
+        {% endfor %}
+      </div>
+    </summary>
+
+    <div class="case-body">
+      {# ── Input / Output ── #}
+      <div class="case-io">
+        <div class="io-block">
+          <label>Input</label>
+          <pre>{% if case.input is string %}{{ case.input }}{% else %}{{ case.input | tojson(indent=2) }}{% endif %}</pre>
+        </div>
+        <div class="io-block">
+          <label>Output</label>
+          <pre>{% if case.output is string %}{{ case.output }}{% else %}{{ case.output | tojson(indent=2) }}{% endif %}</pre>
+        </div>
+      </div>
+
+      {# ── Score chips with values ── #}
+      <div class="scores-row">
+        {% for sc in case.scores %}
+          {% if sc.error %}
+          <span class="score-chip errored" title="{{ sc.error }}">{{ sc.scorer }}: err</span>
+          {% elif sc.passed is not none %}
+            {% if sc.value is not none %}
+              {% if sc.passed %}
+              <span class="score-chip pass">{{ sc.scorer }}: {{ (sc.value * 100)|round|int }}%</span>
+              {% else %}
+              <span class="score-chip fail">{{ sc.scorer }}: {{ (sc.value * 100)|round|int }}%</span>
+              {% endif %}
+            {% else %}
+              {% if sc.passed %}
+              <span class="score-chip pass">{{ sc.scorer }}</span>
+              {% else %}
+              <span class="score-chip fail">{{ sc.scorer }}</span>
+              {% endif %}
+            {% endif %}
+          {% else %}
+          <span class="score-chip" style="color:var(--light-text)">{{ sc.scorer }}: —</span>
+          {% endif %}
+        {% endfor %}
+      </div>
+
+      {# ── Spans / Trace ── #}
+      {% if case.spans %}
+      <div style="font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--light-text);margin-bottom:0.4rem;font-family:'Inter',sans-serif">Trace</div>
+      <div class="spans-list">
+        {% for sp in case.spans %}
+        <div class="span-row">
+          <div>
+            <span class="span-type">{{ sp.type }}</span>
+            <span class="span-name">{{ sp.name }}</span>
+          </div>
+          {% if sp.error %}
+          <div class="span-error">{{ sp.error }}</div>
+          {% elif sp.output is not none %}
+          <div class="span-output">
+            {% if sp.output is string %}{{ sp.output[:200] }}{% else %}{{ sp.output | tojson }}{% endif %}
+          </div>
+          {% endif %}
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+
+    </div>
+  </details>
+  {% endfor %}
+
+  {% else %}
+  <div class="empty-state">
+    <h3>No cases in this run.</h3>
+  </div>
+  {% endif %}
+
+</div>
+{% endblock %}

@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}Settings — TokenSurf{% endblock %}
+
+{% block content %}
+<div class="page">
+  <div class="page-header">
+    <h1 class="page-title">Settings</h1>
+    <p class="page-sub">Select a project to manage its quality gates and notification channels.</p>
+  </div>
+
+  {% if projects %}
+  <div class="feature-grid">
+    {% for p in projects %}
+    <a href="/settings/{{ p.slug }}" class="feature-card" style="text-decoration:none;display:block;color:inherit">
+      <div class="feature-head">
+        <span class="scorer-pill">{{ p.slug }}</span>
+      </div>
+      <p class="feature-desc" style="margin-bottom:0">{{ p.name }}</p>
+    </a>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="empty-state">
+    <h3>No projects yet</h3>
+    <p>Create a project first: <code class="create-project">tokensurf-server create-project &lt;name&gt;</code></p>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

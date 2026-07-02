@@ -1,0 +1,21 @@
+# Secrets — never commit real credentials
+.env
+.env.*
+!.env.example
+
+# Python artefacts
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Virtual environments
+.venv/
+
+# Test / coverage
+.coverage
+htmlcov/
+.pytest_cache/
+
+# Build / dist
+dist/
+*.egg-info/

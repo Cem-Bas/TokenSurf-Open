@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block title %}Projects — TokenSurf{% endblock %}
+
+{% block content %}
+<div class="page">
+  <div class="page-header">
+    <h1 class="page-title">Projects</h1>
+    <p class="page-sub">All evaluation projects, newest run first.</p>
+  </div>
+
+  {% if projects %}
+  <div class="project-grid">
+    {% for p in projects %}
+    <a href="/projects/{{ p.slug }}" class="project-card">
+      <div class="project-card-name">{{ p.name }}</div>
+      <div class="project-card-meta">
+        {{ p.run_count }} run{% if p.run_count != 1 %}s{% endif %}
+        {% if p.last_run_at %}
+          · last {{ p.last_run_at.strftime('%Y-%m-%d') }}
+        {% endif %}
+      </div>
+
+      {% if p.sparkline %}
+      <div class="sparkline" title="Pass-rate trend">
+        {% for v in p.sparkline %}
+        {# height = 10-90% clamped; v is a float 0-1 from DB — safe arithmetic #}
+        <span style="height: {{ [10, [90, (v * 100)|int]|min]|max }}%"></span>
+        {% endfor %}
+      </div>
+      {% endif %}
+
+      <div class="project-card-footer">
+        {% if p.latest_pass_rate is not none %}
+          {% set pct = (p.latest_pass_rate * 100)|round(1) %}
+          {% if p.latest_pass_rate >= 0.75 %}
+          <span class="score-chip pass">{{ pct }}%</span>
+          {% elif p.latest_pass_rate >= 0.5 %}
+          <span class="score-chip fail">{{ pct }}%</span>
+          {% else %}
+          <span class="score-chip errored">{{ pct }}%</span>
+          {% endif %}
+        {% else %}
+          <span class="score-chip" style="color:var(--light-text)">—</span>
+        {% endif %}
+        <span style="font-size:0.75rem;color:var(--light-text)">View runs →</span>
+      </div>
+    </a>
+    {% endfor %}
+  </div>
+
+  {% else %}
+  <div class="empty-state">
+    <h3>No projects yet</h3>
+    <p>Create one with <code class="create-project">tokensurf-server create-project</code> then push a run.</p>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

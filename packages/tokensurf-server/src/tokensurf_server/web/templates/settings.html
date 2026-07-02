@@ -1,0 +1,279 @@
+{% extends "base.html" %}
+{% block title %}Settings — {{ name }} — TokenSurf{% endblock %}
+
+{% block content %}
+<div class="page">
+  <div class="breadcrumb">
+    <a href="/settings">Settings</a>
+    <span>›</span>
+    <span>{{ name }}</span>
+  </div>
+
+  <div class="page-header">
+    <h1 class="page-title">Settings — {{ name }}</h1>
+    <p class="page-sub"><span class="mono">{{ slug }}</span></p>
+  </div>
+
+  {# ── Quality Gates ── #}
+  <div class="card" style="padding:0;overflow:hidden;margin-bottom:1.4rem">
+    <div style="padding:1.1rem 1.35rem;border-bottom:1px solid var(--border)">
+      <h2 style="font-family:'Inter',sans-serif;font-size:0.95rem;font-weight:800">Quality Gates</h2>
+    </div>
+
+    {% if gates %}
+    <div class="table-wrapper">
+      <table>
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Metric</th>
+            <th>Scorer</th>
+            <th>Rule</th>
+            <th>Threshold</th>
+            <th>Enabled</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for gate in gates %}
+          <tr>
+            <td class="mono">{{ gate.name }}</td>
+            <td>{{ gate.metric }}</td>
+            <td>{{ gate.scorer or "—" }}</td>
+            <td>{{ gate.comparison }}</td>
+            <td class="mono">{{ gate.threshold }}</td>
+            <td style="color:var(--light-text);font-size:0.82rem">{% if gate.enabled %}yes{% else %}no{% endif %}</td>
+            <td>
+              <form method="post" action="/settings/{{ slug }}/gates/{{ gate.id }}/delete" style="display:inline">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                <button type="submit" style="font-size:0.75rem;color:var(--red);background:none;border:none;cursor:pointer;padding:0">Delete</button>
+              </form>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div style="padding:1.8rem 1.35rem;color:var(--light-text);font-size:0.9rem">No quality gates yet.</div>
+    {% endif %}
+
+    <div style="padding:1.2rem 1.35rem;border-top:1px solid var(--border)">
+      <h3 style="font-family:'Inter',sans-serif;font-size:0.78rem;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:var(--light-text);margin-bottom:0.9rem">Add Gate</h3>
+      <form method="post" action="/settings/{{ slug }}/gates">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <div style="display:flex;flex-wrap:wrap;gap:0.7rem;align-items:flex-end">
+          <div class="form-group" style="margin:0;flex:2;min-width:140px">
+            <label>Name</label>
+            <input type="text" name="name" required placeholder="e.g. pass rate threshold">
+          </div>
+          <div class="form-group" style="margin:0;flex:1;min-width:130px">
+            <label>Metric</label>
+            <select name="metric" style="width:100%;padding:0.65rem 0.75rem;border:1px solid var(--border);border-radius:9px;font-family:var(--font-body);font-size:0.95rem">
+              <option value="pass_rate">pass_rate</option>
+              <option value="mean_score">mean_score</option>
+              <option value="scorer_pass_rate">scorer_pass_rate</option>
+            </select>
+          </div>
+          <div class="form-group" style="margin:0;flex:1;min-width:110px">
+            <label>Scorer (optional)</label>
+            <input type="text" name="scorer" placeholder="scorer name">
+          </div>
+          <div class="form-group" style="margin:0;min-width:90px">
+            <label>Rule</label>
+            <select name="comparison" style="padding:0.65rem 0.75rem;border:1px solid var(--border);border-radius:9px;font-family:var(--font-body);font-size:0.95rem">
+              <option value="gte">≥ (gte)</option>
+              <option value="gt">> (gt)</option>
+              <option value="lte">≤ (lte)</option>
+              <option value="lt">< (lt)</option>
+            </select>
+          </div>
+          <div class="form-group" style="margin:0;min-width:90px">
+            <label>Threshold (0–1)</label>
+            <input type="number" name="threshold" step="0.01" min="0" max="1" required placeholder="0.90">
+          </div>
+          <button type="submit" class="btn-primary" style="width:auto;padding:0.65rem 1.2rem;flex-shrink:0">Add gate</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  {# ── Notification Channels ── #}
+  <div class="card" style="padding:0;overflow:hidden;margin-bottom:1.4rem">
+    <div style="padding:1.1rem 1.35rem;border-bottom:1px solid var(--border)">
+      <h2 style="font-family:'Inter',sans-serif;font-size:0.95rem;font-weight:800">Notification Channels</h2>
+    </div>
+
+    {% if channels %}
+    <div class="table-wrapper">
+      <table>
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Secret</th>
+            <th>Enabled</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for channel in channels %}
+          <tr>
+            <td>{{ channel.name }}</td>
+            <td>{{ channel.type }}</td>
+            <td>
+              {% if channel.has_secret %}
+              <span style="font-family:var(--font-mono);font-size:0.8rem;color:var(--light-text)">•••• set</span>
+              {% else %}
+              <span style="color:var(--light-text)">—</span>
+              {% endif %}
+            </td>
+            <td style="color:var(--light-text);font-size:0.82rem">{% if channel.enabled %}yes{% else %}no{% endif %}</td>
+            <td style="display:flex;gap:0.6rem;align-items:center;padding:0.7rem 1.35rem">
+              <form method="post" action="/settings/{{ slug }}/channels/{{ channel.id }}/test" style="display:inline">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                <button type="submit" style="font-size:0.75rem;color:var(--accent);background:none;border:none;cursor:pointer;padding:0">Test</button>
+              </form>
+              <form method="post" action="/settings/{{ slug }}/channels/{{ channel.id }}/delete" style="display:inline">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                <button type="submit" style="font-size:0.75rem;color:var(--red);background:none;border:none;cursor:pointer;padding:0">Delete</button>
+              </form>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div style="padding:1.8rem 1.35rem;color:var(--light-text);font-size:0.9rem">No notification channels yet.</div>
+    {% endif %}
+
+    <div style="padding:1.2rem 1.35rem;border-top:1px solid var(--border)">
+      <h3 style="font-family:'Inter',sans-serif;font-size:0.78rem;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:var(--light-text);margin-bottom:0.9rem">Add Channel</h3>
+      <form method="post" action="/settings/{{ slug }}/channels">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <div style="display:flex;flex-wrap:wrap;gap:0.7rem;align-items:flex-end">
+          <div class="form-group" style="margin:0;flex:2;min-width:140px">
+            <label>Name</label>
+            <input type="text" name="name" required placeholder="e.g. #alerts-slack">
+          </div>
+          <div class="form-group" style="margin:0;min-width:100px">
+            <label>Type</label>
+            <select name="type" style="padding:0.65rem 0.75rem;border:1px solid var(--border);border-radius:9px;font-family:var(--font-body);font-size:0.95rem">
+              <option value="slack">Slack</option>
+              <option value="webhook">Webhook</option>
+              <option value="email">Email</option>
+            </select>
+          </div>
+          <div class="form-group" style="margin:0;flex:2;min-width:180px">
+            <label>Secret / Webhook URL</label>
+            <input type="password" name="secret" required placeholder="••••••••">
+          </div>
+          <div class="form-group" style="margin:0;flex:1;min-width:140px">
+            <label>To (email only)</label>
+            <input type="text" name="to" placeholder="team@example.com">
+          </div>
+          <button type="submit" class="btn-primary" style="width:auto;padding:0.65rem 1.2rem;flex-shrink:0">Add channel</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  {# ── Judge Keys ── #}
+  <div class="card" style="padding:0;overflow:hidden;margin-bottom:1.4rem">
+    <div style="padding:1.1rem 1.35rem;border-bottom:1px solid var(--border)">
+      <h2 style="font-family:'Inter',sans-serif;font-size:0.95rem;font-weight:800">Judge Keys</h2>
+    </div>
+
+    {% if secrets %}
+    <div class="table-wrapper">
+      <table>
+        <thead>
+          <tr>
+            <th>Provider</th>
+            <th>Key</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for s in secrets %}
+          <tr>
+            <td class="mono">{{ s.provider }}</td>
+            <td>
+              {% if s.has_value %}
+              <span style="font-family:var(--font-mono);font-size:0.8rem;color:var(--light-text)">•••• set</span>
+              {% else %}
+              <span style="color:var(--light-text)">—</span>
+              {% endif %}
+            </td>
+            <td>
+              <form method="post" action="/settings/{{ slug }}/secrets/{{ s.provider }}/delete" style="display:inline">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                <button type="submit" style="font-size:0.75rem;color:var(--red);background:none;border:none;cursor:pointer;padding:0">Delete</button>
+              </form>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div style="padding:1.8rem 1.35rem;color:var(--light-text);font-size:0.9rem">No judge keys configured yet.</div>
+    {% endif %}
+
+    <div style="padding:1.2rem 1.35rem;border-top:1px solid var(--border)">
+      <h3 style="font-family:'Inter',sans-serif;font-size:0.78rem;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:var(--light-text);margin-bottom:0.9rem">Add Key</h3>
+      <form method="post" action="/settings/{{ slug }}/secrets">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <div style="display:flex;flex-wrap:wrap;gap:0.7rem;align-items:flex-end">
+          <div class="form-group" style="margin:0;min-width:140px">
+            <label>Provider</label>
+            <select name="provider" style="padding:0.65rem 0.75rem;border:1px solid var(--border);border-radius:9px;font-family:var(--font-body);font-size:0.95rem">
+              <option value="openai">openai</option>
+              <option value="anthropic">anthropic</option>
+              <option value="gemini">gemini</option>
+              <option value="other">other</option>
+            </select>
+          </div>
+          <div class="form-group" style="margin:0;flex:2;min-width:180px">
+            <label>API Key</label>
+            <input type="password" name="secret" required placeholder="••••••••">
+          </div>
+          <button type="submit" class="btn-primary" style="width:auto;padding:0.65rem 1.2rem;flex-shrink:0">Save key</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  {# ── Recent Activity ── #}
+  <div class="card" style="padding:0;overflow:hidden;margin-bottom:1.4rem">
+    <div style="padding:1.1rem 1.35rem;border-bottom:1px solid var(--border)">
+      <h2 style="font-family:'Inter',sans-serif;font-size:0.95rem;font-weight:800">Recent Activity</h2>
+    </div>
+    {% if activity %}
+    <div class="table-wrapper">
+      <table>
+        <thead>
+          <tr>
+            <th>Event</th>
+            <th>Actor</th>
+            <th>When</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in activity %}
+          <tr>
+            <td class="mono">{{ row.event }}</td>
+            <td>{{ row.actor or "—" }}</td>
+            <td style="color:var(--light-text);font-size:0.82rem">{{ row.created_at.strftime("%Y-%m-%d %H:%M") }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div style="padding:1.8rem 1.35rem;color:var(--light-text);font-size:0.9rem">No recent activity.</div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

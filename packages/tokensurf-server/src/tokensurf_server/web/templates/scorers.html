@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% block title %}Scorers — TokenSurf{% endblock %}
+
+{% block content %}
+<div class="page">
+  <div class="page-header">
+    <h1 class="page-title">Scorers</h1>
+    <p class="page-sub">The four scorer families that grade every agent run. Each score is normalized to 0–1.</p>
+  </div>
+
+  <div class="feature-grid">
+    <div class="feature-card">
+      <div class="feature-head">
+        <span class="scorer-pill">LLM-judge</span>
+        <span class="badge status-badge passed">flexible</span>
+      </div>
+      <p class="feature-desc">An LLM grades the response against criteria — accuracy, completeness, relevance, helpfulness — on a 1–10 rubric, normalized to 0–1. Provider-agnostic via litellm; bring your own judge model.</p>
+      <div class="feature-tags">
+        <span class="scorer-pill">LLMJudge</span>
+      </div>
+    </div>
+
+    <div class="feature-card">
+      <div class="feature-head">
+        <span class="scorer-pill">Deterministic</span>
+        <span class="badge status-badge passed">fast · cheap</span>
+      </div>
+      <p class="feature-desc">Code-based assertions with no model call — exact/fuzzy matches, schema validity, tool-call and latency/cost checks. Reproducible and free.</p>
+      <div class="feature-tags">
+        <span class="scorer-pill">ExactMatch</span>
+        <span class="scorer-pill">Contains</span>
+        <span class="scorer-pill">Regex</span>
+        <span class="scorer-pill">JSONSchemaValid</span>
+        <span class="scorer-pill">LatencyUnder</span>
+        <span class="scorer-pill">CostUnder</span>
+        <span class="scorer-pill">ToolCalled</span>
+      </div>
+    </div>
+
+    <div class="feature-card">
+      <div class="feature-head">
+        <span class="scorer-pill">Reference-based</span>
+        <span class="badge status-badge running">optional</span>
+      </div>
+      <p class="feature-desc">Compare the output against an expected answer using embedding similarity. Objective when you have labeled data.</p>
+      <div class="feature-tags">
+        <span class="scorer-pill">EmbeddingSimilarity</span>
+      </div>
+    </div>
+
+    <div class="feature-card">
+      <div class="feature-head">
+        <span class="scorer-pill">Agent-trajectory</span>
+        <span class="badge status-badge passed">differentiator</span>
+      </div>
+      <p class="feature-desc">Grade the whole multi-step run, not just the final answer — tool ordering, loops, step budget, task completion, and recovery from errors.</p>
+      <div class="feature-tags">
+        <span class="scorer-pill">ToolSequence</span>
+        <span class="scorer-pill">NoLoops</span>
+        <span class="scorer-pill">StepBudget</span>
+        <span class="scorer-pill">TaskCompletion</span>
+        <span class="scorer-pill">Recovery</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" id="docs" style="margin-top:1.4rem;padding:1.4rem 1.6rem">
+    <h2 style="font-size:1rem;margin-bottom:0.5rem">Using scorers</h2>
+    <p class="page-sub" style="margin:0">Decorate your agent with <span class="mono">@ts.track</span>, define scorers, and run <span class="mono">tokensurf eval</span> in CI. Runs push to this dashboard automatically.</p>
+  </div>
+</div>
+{% endblock %}
