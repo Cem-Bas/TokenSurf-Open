@@ -49,6 +49,8 @@ def test_hostname_not_resolved_by_default():
         "http://0251.0376.0251.0376/",  # dotted octal
         "http://169.254.169.254./",  # trailing dot
         "http://[::ffff:169.254.169.254]/",  # IPv4-mapped IPv6
+        "http://025177524776/latest/meta-data/",  # leading-zero OCTAL bare integer
+        "http://0xA9FEA9FE/",  # 0x single-integer hex
     ],
 )
 def test_metadata_ip_disguises_blocked_by_default(url):

@@ -46,9 +46,12 @@ def _literal_ip(host: str) -> IPAddress | None:
     """Return the address a literal host encodes (any common form), or None for a hostname."""
     h = host.rstrip(".")
     for parse in (
-        lambda: ipaddress.ip_address(h),
-        lambda: ipaddress.ip_address(int(h)) if h.isdigit() else None,
-        lambda: ipaddress.ip_address(socket.inet_aton(h)),  # dotted hex/octal/short forms
+        lambda: ipaddress.ip_address(h),  # canonical IPv4 / IPv6 literal
+        # inet_aton decodes dotted/hex/octal/short AND bare-integer forms with the SAME C
+        # semantics the OS resolver uses — critically, it reads a leading-zero integer as
+        # octal (as getaddrinfo does). A hand-rolled int(h) would read it as decimal and
+        # create a parser differential the resolver would then defeat.
+        lambda: ipaddress.ip_address(socket.inet_aton(h)),
     ):
         try:
             ip = parse()
