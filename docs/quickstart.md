@@ -25,8 +25,7 @@ uv run tokensurf --help
 
 ```bash
 uv run tokensurf init my-agent-tests
-cd my-agent-tests
-uv run --directory ../.. tokensurf eval run evals/example_deterministic.py
+uv run tokensurf eval run my-agent-tests/evals/example_deterministic.py
 ```
 
 This generates `evals/example_deterministic.py`, `evals/example_llm_judge.py`, a
