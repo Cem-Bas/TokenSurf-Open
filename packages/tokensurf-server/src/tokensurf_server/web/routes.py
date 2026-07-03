@@ -8,6 +8,7 @@ All other context variables (labels, case input/output, trace) are autoescaped.
 from __future__ import annotations
 
 import logging
+import secrets
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -53,6 +54,14 @@ templates = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
 _login_count, _login_window = parse_rate(get_settings().login_rate_limit)
 _login_limiter = SlidingWindowLimiter(_login_count, _login_window)
 _login_email_limiter = SlidingWindowLimiter(_login_count, _login_window)
+
+# Brute-force throttle for POST /setup, IP-keyed only: unlike login there's no
+# "account" to key a second limiter on (the setup token isn't tied to an email until
+# the account is created). Reuses login_rate_limit rather than adding a new config
+# knob — this is conceptually the same guard (throttling repeated auth-secret
+# guesses against a single, security-critical endpoint).
+_setup_count, _setup_window = parse_rate(get_settings().login_rate_limit)
+_setup_limiter = SlidingWindowLimiter(_setup_count, _setup_window)
 
 # Precomputed once so login does the same PBKDF2 work whether or not the email
 # exists — closing the timing oracle that would otherwise enumerate valid emails.
@@ -106,14 +115,19 @@ def post_setup(
     csrf_token: str = Form(default=""),
     session: Session = Depends(get_session),  # noqa: B008
 ) -> Response:
-    # CSRF check first (matching post_login's ordering), then the TOCTOU re-check of
-    # _any_user_exists — a second submission racing the first must still be rejected
-    # even though GET /setup already redirected it away once.
+    # CSRF check first (matching post_login's ordering).
     _require_csrf(request, csrf_token)
-    if _any_user_exists(session):
-        return RedirectResponse("/login", status_code=303)
+    # Throttle setup-token brute force per client IP (mirrors post_login's IP limiter;
+    # setup has no "account" to key a second limiter on the way login keys on email).
+    client_ip = request.client.host if request.client else "unknown"
+    if not _setup_limiter.allow(client_ip):
+        raise HTTPException(
+            status_code=429,
+            detail="Too many setup attempts",
+            headers={"Retry-After": str(_setup_limiter.retry_after(client_ip))},
+        )
     expected_token = get_or_create_token(Path(get_settings().setup_token_path))
-    if token != expected_token:
+    if not secrets.compare_digest(token, expected_token):
         return templates.TemplateResponse(
             request,
             "setup.html",
@@ -124,6 +138,14 @@ def post_setup(
             status_code=401,
         )
     user = User(id=new_id(), email=email, password_hash=hash_password(password))
+    # TOCTOU re-check immediately before the commit — as close to the write as
+    # possible so a second submission racing this one (both starting while no user
+    # exists) can't both succeed. hash_password() above is ~240k PBKDF2 iterations;
+    # doing the re-check here (vs. at function entry) minimizes, though doesn't
+    # eliminate, the check-then-act race window. A true fix needs a DB-level unique
+    # constraint or advisory lock — out of scope here.
+    if _any_user_exists(session):
+        return RedirectResponse("/login", status_code=303)
     session.add(user)
     session.commit()
     resp = RedirectResponse("/", status_code=303)

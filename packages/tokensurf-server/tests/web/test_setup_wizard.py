@@ -88,6 +88,8 @@ def test_post_setup_creates_user_and_logs_in(
     user = db_session.scalar(select(User).where(User.email == "admin@example.test"))
     assert user is not None
     assert verify_password("correct-horse-battery", user.password_hash)
+    # Explicit "never plaintext" check, in addition to the verify_password round-trip above.
+    assert user.password_hash != "correct-horse-battery"
 
 
 def test_post_setup_rejects_wrong_token(
@@ -136,3 +138,45 @@ def test_post_setup_without_csrf_returns_403(client: TestClient, _setup_token_pa
         data={"token": token, "email": "admin@example.test", "password": "correct-horse-battery"},
     )
     assert resp.status_code == 403
+
+
+def test_post_setup_rate_limited_returns_429(
+    client: TestClient,
+    db_session: Session,
+    _setup_token_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """After the per-IP setup limit is exceeded, POST /setup returns 429 + Retry-After.
+
+    Mirrors test_login_rate_limited_returns_429 in test_web_routes.py.
+    """
+    from tokensurf_server.ratelimit import SlidingWindowLimiter
+    from tokensurf_server.web import routes
+
+    get_or_create_token(_setup_token_path)
+    monkeypatch.setattr(routes, "_setup_limiter", SlidingWindowLimiter(2, 60))
+    # 2 attempts (wrong token -> 401) are allowed...
+    for _ in range(2):
+        r = client.post(
+            "/setup",
+            data={
+                "token": "not-the-real-token",
+                "email": "admin@example.test",
+                "password": "correct-horse-battery",
+                "csrf_token": _csrf(client),
+            },
+        )
+        assert r.status_code == 401
+    # ...the 3rd is throttled before the token check.
+    r = client.post(
+        "/setup",
+        data={
+            "token": "not-the-real-token",
+            "email": "admin@example.test",
+            "password": "correct-horse-battery",
+            "csrf_token": _csrf(client),
+        },
+    )
+    assert r.status_code == 429
+    assert "retry-after" in {k.lower() for k in r.headers}
+    assert db_session.scalar(select(User).where(User.email == "admin@example.test")) is None
