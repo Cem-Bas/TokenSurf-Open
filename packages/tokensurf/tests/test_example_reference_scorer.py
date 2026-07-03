@@ -34,11 +34,13 @@ def test_reference_example_runs_end_to_end(capsys: pytest.CaptureFixture[str]) -
     # c1 and c2's outputs produce bag-of-words vectors identical to their
     # expected text's vectors (the words that do overlap - "capital"/"france"
     # for c1, "capital"/"japan" for c2 - are the only nonzero vocab dims on
-    # both sides once trailing punctuation is stripped by the fake
-    # tokenizer's whitespace split), so cosine similarity is ~1.0 and both
-    # pass. c3's output ("sky"/"blue") shares no vocab word with its
-    # (deliberately mismatched) expected text ("capital"/"france"), so cosine
-    # similarity is 0.0 and it fails against threshold=0.5.
+    # both sides). The fake tokenizer's whitespace split does NOT strip
+    # punctuation, so tokens like "paris." or "paris," never match the vocab
+    # token "paris" and simply end up as zero dims on both sides - that's
+    # exactly why they don't affect the comparison. So cosine similarity is
+    # ~1.0 and both pass. c3's output ("sky"/"blue") shares no vocab word
+    # with its (deliberately mismatched) expected text ("capital"/"france"),
+    # so cosine similarity is 0.0 and it fails against threshold=0.5.
     assert report.pass_rate() == pytest.approx(2 / 3)
 
 

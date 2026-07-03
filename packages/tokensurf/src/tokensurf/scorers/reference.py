@@ -5,7 +5,6 @@ from typing import Protocol, runtime_checkable
 
 from tokensurf.core.models import Case, ScoreResult, Trace
 from tokensurf.scorers.base import Scorer, register
-from tokensurf.scorers.llm import LLMClient
 
 
 @runtime_checkable
@@ -29,7 +28,7 @@ class EmbeddingSimilarity(Scorer):
     def __init__(
         self,
         model: str = "text-embedding-3-small",
-        client: LLMClient | None = None,
+        client: EmbeddingClient | None = None,
         threshold: float = 0.8,
     ):
         self.model = model
