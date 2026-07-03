@@ -1,19 +1,20 @@
 # CLI reference
 
-TokenSurf ships two command-line tools: `tokensurf` (from the `tokensurf` library package) runs and
-reports offline agent evaluations, and `tokensurf-server` (from the `tokensurf-server` package) is
-the admin CLI for a self-hosted TokenSurf Server — migrations, projects, keys, users, gates,
-channels, and secrets.
+TokenSurf ships one CLI, `tokensurf`. When both the `tokensurf` and `tokensurf-server` packages are
+installed in the same environment (the default for `uv sync` at the repo root, and inside the
+server's Docker image), `tokensurf` also gains a `server` command group with the self-hosted
+server's admin commands — migrations, projects, keys, users, gates, channels, and secrets. If only
+`tokensurf` is installed (e.g. a CI job that only runs evals), the `server` group is simply absent
+from `tokensurf --help`.
 
 The packages are not published to PyPI. Install from source (clone the repo, then `uv sync`) and
-invoke each CLI through `uv run --directory` from the repository root:
+invoke the CLI through `uv run` from the repository root:
 
 ```bash
-# library CLI (console script: tokensurf)
-uv run --directory packages/tokensurf tokensurf --help
-
-# server admin CLI (console script: tokensurf-server)
-uv run --directory packages/tokensurf-server tokensurf-server --help
+uv run tokensurf --help
+uv run tokensurf init my-tests          # scaffold a starter project
+uv run tokensurf eval run FILE          # run an eval
+uv run tokensurf server migrate         # admin: run migrations (only if tokensurf-server installed)
 ```
 
 `uv run --directory <pkg>` changes into that package directory before running, which also puts the

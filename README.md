@@ -26,8 +26,10 @@ Nothing leaves your infrastructure: the optional collector server is self-hosted
 
 ## Quickstart
 
-From a clone of this repository, `uv sync` installs the workspace. Then write an `eval.py` that
-exposes module-level `task`, `data`, and `scorers`:
+From a clone of this repository, `uv sync` installs the workspace.
+
+The fastest way in: `uv run tokensurf init my-tests` scaffolds a runnable starter project (example
+evals + a pytest CI gate). Or write one by hand:
 
 ```python
 import tokensurf as ts

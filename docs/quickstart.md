@@ -21,7 +21,20 @@ Check that the CLI is available:
 uv run tokensurf --help
 ```
 
-## 2. Write an eval file
+## 2. Scaffold a starter project (fastest path in)
+
+```bash
+uv run tokensurf init my-agent-tests
+cd my-agent-tests
+uv run --directory ../.. tokensurf eval run evals/example_deterministic.py
+```
+
+This generates `evals/example_deterministic.py`, `evals/example_llm_judge.py`, a
+`evals/test_agent_quality.py` pytest gate, and a README — a runnable starting point you edit
+in place. The rest of this page shows what those generated files do and how to write your own
+from scratch.
+
+## 3. Write an eval file
 
 An eval file is a plain Python file that defines three module-level names: `task` (the callable
 under test), `data` (a `Dataset` of cases), and `scorers` (a list of `Scorer` instances). Save the
@@ -73,7 +86,7 @@ What each piece does:
   `ToolSequence(expected=["lookup"])` is a trajectory scorer: it checks that the run's tool spans
   contain `"lookup"` in order. See [Scorers](scorers.md) for the full catalog.
 
-## 3. Run the eval
+## 4. Run the eval
 
 ```bash
 uv run tokensurf eval run eval.py
@@ -124,7 +137,7 @@ Options for `tokensurf eval run`:
 | `--label` | none | Human-readable run label (e.g. branch name or git sha) |
 | `--no-config-pull` | off | Do not pull judge keys from the server before running |
 
-## 4. Optional: push runs to a self-hosted server
+## 5. Optional: push runs to a self-hosted server
 
 TokenSurf Server is a self-hosted FastAPI + Postgres collector with a dashboard, quality gates,
 and notifications. It runs inside your own trust boundary. This section shows the shortest local
@@ -187,7 +200,7 @@ uv run --directory packages/tokensurf-server tokensurf-server create-user you@ex
 
 The run appears under your project with per-case scores and the captured trajectory.
 
-## 5. Gate CI with pytest
+## 6. Gate CI with pytest
 
 `assert_eval` turns a report into a pass/fail test: it raises `AssertionError` (including the
 console summary) when the pass rate is below your threshold. Save this next to `eval.py` as
@@ -226,5 +239,9 @@ verdict comes only from `assert_eval`.
   trajectory) and how to write your own.
 - `packages/tokensurf/examples/quickstart_eval.py` — the repo's canonical variant of this eval,
   which adds an `LLMJudge` scorer backed by an offline `FakeLLMClient` (no provider key needed).
+- `packages/tokensurf/examples/deterministic_scorers.py`,
+  `packages/tokensurf/examples/trajectory_scorers.py`,
+  `packages/tokensurf/examples/reference_scorer.py` — worked examples of the other three scorer
+  families, all offline. `tokensurf init` copies the first two of these into any new project.
 - [Self-hosting](self-hosting.md) — production server setup: secrets encryption, quality gates,
   notification channels, and Docker deployment.
