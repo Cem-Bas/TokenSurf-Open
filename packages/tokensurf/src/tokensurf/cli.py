@@ -11,6 +11,7 @@ import typer
 
 from tokensurf.eval.reporter import render_console, write_jsonl
 from tokensurf.eval.runner import evaluate
+from tokensurf.scaffold import write_project
 from tokensurf.sdk.config import ConfigError, fetch_config
 from tokensurf.sdk.push import PushError, push_report
 
@@ -135,6 +136,28 @@ def report(
             status = "ERROR" if error else ("PASS" if passed else "FAIL")
             value_str = f"{value:.3f}" if isinstance(value, (int, float)) else "n/a"
             typer.echo(f"  {case_id:<10} {scorer:<16} {status:<6} {value_str}")
+
+
+@app.command("init")
+def init(
+    directory: str = typer.Argument("tokensurf-tests", help="Directory to scaffold into."),
+    force: bool = typer.Option(False, "--force", help="Overwrite existing files."),
+) -> None:
+    """Scaffold a starter project: example evals + a pytest CI gate."""
+    target = Path(directory)
+    try:
+        written = write_project(target, force=force)
+    except FileExistsError as exc:
+        typer.echo(f"Error: {exc}", err=True)
+        raise typer.Exit(code=1) from exc
+    typer.echo(f"Created {len(written)} files in {target}/:")
+    for path in written:
+        typer.echo(f"  {path}")
+    typer.echo("")
+    typer.echo("Next steps:")
+    typer.echo(f"  cd {directory}")
+    typer.echo("  tokensurf eval run evals/example_deterministic.py")
+    typer.echo("  pytest evals/")
 
 
 def main() -> None:
