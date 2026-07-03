@@ -19,6 +19,14 @@ app = typer.Typer(help="TokenSurf agent-quality CLI.")
 eval_app = typer.Typer(help="Run and report agent evaluations.")
 app.add_typer(eval_app, name="eval")
 
+try:
+    from tokensurf_server.admin_cli import app as _server_app
+except ModuleNotFoundError:
+    _server_app = None
+
+if _server_app is not None:
+    app.add_typer(_server_app, name="server", help="Admin commands for a self-hosted server.")
+
 _PROVIDER_ENV: dict[str, str] = {
     "openai": "OPENAI_API_KEY",
     "anthropic": "ANTHROPIC_API_KEY",
