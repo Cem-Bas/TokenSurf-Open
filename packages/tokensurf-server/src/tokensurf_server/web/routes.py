@@ -16,6 +16,7 @@ from fastapi import APIRouter, Depends, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from tokensurf.core.ids import new_id
 
@@ -123,7 +124,9 @@ def post_setup(
             headers={"Retry-After": str(_setup_limiter.retry_after(client_ip))},
         )
     expected_token = get_or_create_token(Path(get_settings().setup_token_path))
-    if not secrets.compare_digest(token, expected_token):
+    # Encode to bytes: compare_digest(str, str) raises TypeError on non-ASCII input,
+    # which would otherwise surface as an unhandled 500 for a malformed request.
+    if not secrets.compare_digest(token.encode(), expected_token.encode()):
         return templates.TemplateResponse(
             request,
             "setup.html",
@@ -143,7 +146,15 @@ def post_setup(
     if any_user_exists(session):
         return RedirectResponse("/login", status_code=303)
     session.add(user)
-    session.commit()
+    try:
+        session.commit()
+    except IntegrityError:
+        # A second concurrent submission (e.g. a double-click) won the TOCTOU race and
+        # committed first — this commit hit the unique constraint on User.email. The
+        # account was almost certainly just created successfully by that other request,
+        # so send the operator to /login rather than surfacing a 500.
+        session.rollback()
+        return RedirectResponse("/login", status_code=303)
     resp = RedirectResponse("/", status_code=303)
     resp.set_cookie(
         SESSION_COOKIE,

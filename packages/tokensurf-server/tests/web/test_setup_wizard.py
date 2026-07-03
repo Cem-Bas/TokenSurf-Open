@@ -15,6 +15,7 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from tokensurf.core.ids import new_id
 
@@ -129,6 +130,71 @@ def test_post_setup_rejects_when_a_user_already_exists(
     assert resp.status_code == 303
     assert resp.headers["location"].endswith("/login")
     assert db_session.scalar(select(User).where(User.email == "second-admin@example.test")) is None
+
+
+def test_post_setup_rejects_non_ascii_token(
+    client: TestClient, db_session: Session, _setup_token_path: Path
+) -> None:
+    """A non-ASCII token must fail cleanly with 401, not crash compare_digest with a 500.
+
+    secrets.compare_digest(str, str) raises TypeError on non-ASCII input; post_setup
+    encodes both operands to bytes first specifically to avoid that.
+    """
+    get_or_create_token(_setup_token_path)
+    resp = client.post(
+        "/setup",
+        data={
+            "token": "not-the-real-token-éüñ",
+            "email": "admin@example.test",
+            "password": "correct-horse-battery",
+            "csrf_token": _csrf(client),
+        },
+    )
+    assert resp.status_code == 401
+    assert db_session.scalar(select(User).where(User.email == "admin@example.test")) is None
+
+
+def test_post_setup_handles_integrity_error_as_double_submit(
+    client: TestClient,
+    db_session: Session,
+    _setup_token_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Simulate a double-submit race: two requests both pass the any_user_exists()
+    TOCTOU re-check before either commits, so the second commit hits the unique
+    constraint on User.email and raises IntegrityError.
+
+    Reproducing the real race deterministically (two concurrent requests actually
+    interleaved at the DB level) isn't practical in a synchronous TestClient test.
+    Instead we monkeypatch Session.commit to raise IntegrityError on the first call,
+    directly exercising the new except-IntegrityError branch in post_setup: this
+    verifies the actual behavior we care about (a friendly 303 to /login, not a 500)
+    without depending on real thread/transaction timing.
+    """
+    from sqlalchemy.orm import Session as OrmSession
+
+    token = get_or_create_token(_setup_token_path)
+    real_commit = OrmSession.commit
+
+    def _raise_integrity_error(self: Session) -> None:
+        raise IntegrityError("INSERT INTO users ...", {}, Exception("duplicate key"))
+
+    monkeypatch.setattr(OrmSession, "commit", _raise_integrity_error)
+    resp = client.post(
+        "/setup",
+        data={
+            "token": token,
+            "email": "admin@example.test",
+            "password": "correct-horse-battery",
+            "csrf_token": _csrf(client),
+        },
+    )
+    assert resp.status_code == 303, resp.text
+    assert resp.headers["location"].endswith("/login")
+    assert "ts_session" not in resp.cookies
+
+    # Restore real commit so cleanup (e.g. db_session fixture teardown) still works.
+    monkeypatch.setattr(OrmSession, "commit", real_commit)
 
 
 def test_post_setup_without_csrf_returns_403(client: TestClient, _setup_token_path: Path) -> None:
