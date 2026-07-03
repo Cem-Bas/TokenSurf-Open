@@ -16,6 +16,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import select
 from sqlalchemy.orm import Session
+from tokensurf.core.ids import new_id
 
 import tokensurf_server.notify as _notify
 from tokensurf_server import audit_service as audit_service
@@ -26,6 +27,7 @@ from tokensurf_server.db import get_session
 from tokensurf_server.models import NotificationChannel, Project, QualityGate, User
 from tokensurf_server.ratelimit import SlidingWindowLimiter, parse_rate
 from tokensurf_server.security import hash_password, verify_password
+from tokensurf_server.setup_token import get_or_create_token
 from tokensurf_server.web.charts import distribution_bars, trend_svg
 from tokensurf_server.web.csrf import CSRF_COOKIE
 from tokensurf_server.web.csrf import verify as verify_csrf
@@ -78,6 +80,61 @@ def _require_csrf(request: Request, csrf_token: str) -> None:
 # ---------------------------------------------------------------------------
 # Auth routes
 # ---------------------------------------------------------------------------
+
+
+def _any_user_exists(session: Session) -> bool:
+    return session.scalar(select(User.id)) is not None
+
+
+@router.get("/setup", response_class=HTMLResponse)
+def get_setup(request: Request, session: Session = Depends(get_session)) -> Response:  # noqa: B008
+    if _any_user_exists(session):
+        return RedirectResponse("/login", status_code=303)
+    return templates.TemplateResponse(
+        request,
+        "setup.html",
+        {"error": None, "setup_token_path": get_settings().setup_token_path},
+    )
+
+
+@router.post("/setup")
+def post_setup(
+    request: Request,
+    token: str = Form(...),
+    email: str = Form(...),
+    password: str = Form(...),
+    csrf_token: str = Form(default=""),
+    session: Session = Depends(get_session),  # noqa: B008
+) -> Response:
+    # CSRF check first (matching post_login's ordering), then the TOCTOU re-check of
+    # _any_user_exists — a second submission racing the first must still be rejected
+    # even though GET /setup already redirected it away once.
+    _require_csrf(request, csrf_token)
+    if _any_user_exists(session):
+        return RedirectResponse("/login", status_code=303)
+    expected_token = get_or_create_token(Path(get_settings().setup_token_path))
+    if token != expected_token:
+        return templates.TemplateResponse(
+            request,
+            "setup.html",
+            {
+                "error": "Invalid setup token",
+                "setup_token_path": get_settings().setup_token_path,
+            },
+            status_code=401,
+        )
+    user = User(id=new_id(), email=email, password_hash=hash_password(password))
+    session.add(user)
+    session.commit()
+    resp = RedirectResponse("/", status_code=303)
+    resp.set_cookie(
+        SESSION_COOKIE,
+        make_session(user.id),
+        httponly=True,
+        samesite="lax",
+        secure=get_settings().secure_cookies,
+    )
+    return resp
 
 
 @router.get("/login", response_class=HTMLResponse)
