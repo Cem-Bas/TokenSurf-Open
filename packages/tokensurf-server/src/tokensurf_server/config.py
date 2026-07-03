@@ -38,6 +38,12 @@ class Settings(BaseSettings):
     # Per-client rate limit for POST /login as "count/window_seconds" (brute-force throttle).
     login_rate_limit: str = Field(default="10/60", validation_alias="TOKENSURF_LOGIN_RATE_LIMIT")
 
+    # Path to the file holding the first-run admin setup token (env
+    # TOKENSURF_SETUP_TOKEN_PATH). Read by GET/POST /setup while no users exist yet.
+    setup_token_path: str = Field(
+        default="./tokensurf_setup_token", validation_alias="TOKENSURF_SETUP_TOKEN_PATH"
+    )
+
     # When true, notification webhooks may not target private/loopback/reserved addresses.
     # Link-local (cloud-metadata) targets are always refused regardless of this flag.
     webhook_block_private: bool = Field(

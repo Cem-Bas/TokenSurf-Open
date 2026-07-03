@@ -16,6 +16,12 @@ import os
 # does not abort the suite. Production must NOT set this.
 os.environ.setdefault("TOKENSURF_ALLOW_INSECURE_SESSION_SECRET", "1")
 
+# Set a default DATABASE_URL if not provided (allows tests that don't need a real DB
+# to still instantiate Settings without errors).
+os.environ.setdefault(
+    "DATABASE_URL", "postgresql+psycopg://tokensurf:changeme@localhost:5432/tokensurf"
+)
+
 import pytest  # noqa: E402
 from sqlalchemy import create_engine as _create_engine  # noqa: E402
 from sqlalchemy.orm import Session  # noqa: E402
