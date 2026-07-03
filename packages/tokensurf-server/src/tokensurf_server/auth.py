@@ -60,7 +60,6 @@ def current_user(
 
 
 def login_required(
-    request: Request,
     user: User | None = Depends(current_user),  # noqa: B008
     session: Session = Depends(get_session),  # noqa: B008
 ) -> User:
