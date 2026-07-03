@@ -241,6 +241,9 @@ verdict comes only from `assert_eval`.
 - `packages/tokensurf/examples/deterministic_scorers.py`,
   `packages/tokensurf/examples/trajectory_scorers.py`,
   `packages/tokensurf/examples/reference_scorer.py` — worked examples of the other three scorer
-  families, all offline. `tokensurf init` copies the first two of these into any new project.
+  families, all offline. `tokensurf init` does not copy these; it generates its own separate
+  starter files (`evals/example_deterministic.py`, `evals/example_llm_judge.py`,
+  `evals/test_agent_quality.py`, and a `README.md`), inline-templated rather than copied from
+  this directory.
 - [Self-hosting](self-hosting.md) — production server setup: secrets encryption, quality gates,
   notification channels, and Docker deployment.

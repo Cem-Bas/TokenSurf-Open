@@ -12,9 +12,9 @@ invoke the CLI through `uv run` from the repository root:
 
 ```bash
 uv run tokensurf --help
-uv run tokensurf init my-tests          # scaffold a starter project
-uv run tokensurf eval run FILE          # run an eval
-uv run tokensurf server migrate         # admin: run migrations (only if tokensurf-server installed)
+uv run tokensurf init my-tests                                          # scaffold a starter project
+uv run tokensurf eval run FILE                                          # run an eval
+uv run --directory packages/tokensurf-server tokensurf server migrate   # admin: run migrations (only if tokensurf-server installed)
 ```
 
 `uv run --directory <pkg>` changes into that package directory before running, which also puts the
@@ -142,7 +142,9 @@ needs `DATABASE_URL` set (the same database the server uses). `create-channel` a
 additionally need `TOKENSURF_SECRET_KEY`, because they encrypt values at rest. All `create-*`
 commands that take a project slug exit 1 if the project does not exist.
 
-The admin CLI is only exposed via the `tokensurf-server` console script —
+The admin CLI is exposed two ways: as the standalone `tokensurf-server` console script (available
+whenever the `tokensurf-server` package is installed, even without `tokensurf`), and — when both
+packages are installed — as the `tokensurf server` command group described above. Either way,
 `python -m tokensurf_server.admin_cli` is not supported (the module has no `__main__` entry point
 and exits silently without running anything).
 
