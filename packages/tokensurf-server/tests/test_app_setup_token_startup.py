@@ -33,7 +33,8 @@ def _run_lifespan_once(app) -> None:
 def test_startup_logs_setup_token_when_no_users(
     db_session: Session, caplog: pytest.LogCaptureFixture, tmp_path, monkeypatch
 ) -> None:
-    monkeypatch.setenv("TOKENSURF_SETUP_TOKEN_PATH", str(tmp_path / "setup_token"))
+    setup_token_path = tmp_path / "setup_token"
+    monkeypatch.setenv("TOKENSURF_SETUP_TOKEN_PATH", str(setup_token_path))
     from tokensurf_server import config as server_config
 
     server_config.get_settings.cache_clear()
@@ -47,7 +48,10 @@ def test_startup_logs_setup_token_when_no_users(
     with caplog.at_level(logging.INFO):
         _run_lifespan_once(app)
     assert "/setup" in caplog.text
-    assert "token" in caplog.text.lower()
+    # The log must point to *where* the token lives, not contain the raw token
+    # value — raw tokens must not land in log aggregators/log-shipping pipelines.
+    assert str(setup_token_path) in caplog.text
+    assert setup_token_path.read_text().strip() not in caplog.text
 
 
 def test_startup_does_not_log_setup_token_when_users_exist(

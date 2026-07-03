@@ -40,12 +40,12 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
     with get_sessionmaker()() as session:
         user_count = session.scalar(select(func.count(User.id))) or 0
     if user_count == 0:
-        token = get_or_create_token(Path(settings.setup_token_path))
+        get_or_create_token(Path(settings.setup_token_path))
         log.info(
-            "First-run setup: create the admin account at http://%s:%s/setup using token: %s",
+            "First-run setup: create the admin account at http://%s:%s/setup using the token in %s",
             settings.host,
             settings.port,
-            token,
+            settings.setup_token_path,
         )
     yield
 

@@ -67,6 +67,24 @@ def db_session(engine):
 
 
 @pytest.fixture(autouse=True)
+def _isolate_setup_token_path(tmp_path, monkeypatch):
+    """Every test gets its own setup-token file location, so ordinary suite runs
+    never write to (or read stale state from) the real working directory.
+
+    Without this, `_lifespan`'s `get_or_create_token` call (triggered whenever a
+    TestClient's real ASGI lifespan runs with zero users, which is most tests)
+    would write a real, persistent `./tokensurf_setup_token` file into the cwd —
+    the package directory when the suite is run from there.
+    """
+    monkeypatch.setenv("TOKENSURF_SETUP_TOKEN_PATH", str(tmp_path / "tokensurf_setup_token"))
+    from tokensurf_server import config as server_config
+
+    server_config.get_settings.cache_clear()
+    yield
+    server_config.get_settings.cache_clear()
+
+
+@pytest.fixture(autouse=True)
 def _reset_rate_limiters():
     """Clear the per-process rate limiters before each test.
 
