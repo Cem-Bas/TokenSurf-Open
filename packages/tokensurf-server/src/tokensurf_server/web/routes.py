@@ -21,7 +21,7 @@ from tokensurf.core.ids import new_id
 
 import tokensurf_server.notify as _notify
 from tokensurf_server import audit_service as audit_service
-from tokensurf_server.auth import SESSION_COOKIE, login_required, make_session
+from tokensurf_server.auth import SESSION_COOKIE, any_user_exists, login_required, make_session
 from tokensurf_server.config import get_settings
 from tokensurf_server.crypto import encrypt
 from tokensurf_server.db import get_session
@@ -91,13 +91,9 @@ def _require_csrf(request: Request, csrf_token: str) -> None:
 # ---------------------------------------------------------------------------
 
 
-def _any_user_exists(session: Session) -> bool:
-    return session.scalar(select(User.id)) is not None
-
-
 @router.get("/setup", response_class=HTMLResponse)
 def get_setup(request: Request, session: Session = Depends(get_session)) -> Response:  # noqa: B008
-    if _any_user_exists(session):
+    if any_user_exists(session):
         return RedirectResponse("/login", status_code=303)
     return templates.TemplateResponse(
         request,
@@ -144,7 +140,7 @@ def post_setup(
     # doing the re-check here (vs. at function entry) minimizes, though doesn't
     # eliminate, the check-then-act race window. A true fix needs a DB-level unique
     # constraint or advisory lock — out of scope here.
-    if _any_user_exists(session):
+    if any_user_exists(session):
         return RedirectResponse("/login", status_code=303)
     session.add(user)
     session.commit()
@@ -160,7 +156,9 @@ def post_setup(
 
 
 @router.get("/login", response_class=HTMLResponse)
-def get_login(request: Request) -> HTMLResponse:
+def get_login(request: Request, session: Session = Depends(get_session)) -> Response:  # noqa: B008
+    if not any_user_exists(session):
+        return RedirectResponse("/setup", status_code=303)
     return templates.TemplateResponse(request, "login.html", {"error": None})
 
 

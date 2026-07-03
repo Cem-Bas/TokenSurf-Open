@@ -6,6 +6,7 @@ import re
 
 from fastapi import Depends, HTTPException, Request
 from itsdangerous import BadSignature, URLSafeSerializer
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from tokensurf_server.config import get_settings
@@ -42,6 +43,11 @@ def read_session(token: str | None) -> str | None:
         return None
 
 
+def any_user_exists(session: Session) -> bool:
+    """True iff the users table has at least one row (used to gate /setup vs /login)."""
+    return session.scalar(select(User.id)) is not None
+
+
 def current_user(
     request: Request,
     session: Session = Depends(get_session),  # noqa: B008
@@ -53,8 +59,13 @@ def current_user(
     return session.get(User, uid)
 
 
-def login_required(user: User | None = Depends(current_user)) -> User:  # noqa: B008
-    """FastAPI dependency: require an authenticated user or redirect to /login."""
+def login_required(
+    request: Request,
+    user: User | None = Depends(current_user),  # noqa: B008
+    session: Session = Depends(get_session),  # noqa: B008
+) -> User:
+    """FastAPI dependency: require an authenticated user or redirect to /setup or /login."""
     if user is None:
-        raise HTTPException(status_code=303, headers={"Location": "/login"})
+        destination = "/login" if any_user_exists(session) else "/setup"
+        raise HTTPException(status_code=303, headers={"Location": destination})
     return user

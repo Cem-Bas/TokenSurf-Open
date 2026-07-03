@@ -129,11 +129,14 @@ def test_invalid_ts_csrf_cookie_is_reissued(client: TestClient, seeded_user: Use
         pass
 
 
-def test_ts_csrf_cookie_only_on_html_responses(client: TestClient) -> None:
+def test_ts_csrf_cookie_only_on_html_responses(client: TestClient, seeded_user: User) -> None:
     """The ts_csrf cookie is set on HTML pages but NOT on JSON endpoints.
 
     Gating on Content-Type (not path prefix) keeps the cookie off /healthz and
     /openapi.json (header noise / CDN concerns) while HTML forms still get it.
+
+    A user must exist so GET /login renders the login form (200, HTML) instead
+    of redirecting to /setup (303, no content-type header) on a fresh DB.
     """
     # HTML page → cookie present
     login = client.get("/login")
