@@ -18,6 +18,10 @@ def get_or_create_token(path: Path) -> str:
     if path.exists():
         return path.read_text(encoding="utf-8").strip()
     token = new_id()
-    path.write_text(token + "\n", encoding="utf-8")
-    os.chmod(path, 0o600)
+    try:
+        fd = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+    except FileExistsError:
+        return path.read_text(encoding="utf-8").strip()
+    with os.fdopen(fd, "w", encoding="utf-8") as f:
+        f.write(token + "\n")
     return token
