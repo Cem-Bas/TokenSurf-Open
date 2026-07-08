@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="docs/images/logo.png" alt="TokenSurf logo" width="440">
+<img src="docs/images/logo.png" alt="TokenSurf logo" width="480">
 
 # TokenSurf
 
