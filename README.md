@@ -185,6 +185,16 @@ dashboard. Change every `changeme` credential in `docker-compose.yml` before non
 Production setup, environment variables, and the full admin CLI:
 [Self-hosting](docs/self-hosting.md).
 
+<table>
+  <tr>
+    <td><img src="docs/images/project-dashboard.png" alt="Project dashboard: pass-rate trend and run history"></td>
+    <td><img src="docs/images/run-detail.png" alt="Run detail: breached quality gate, scorer breakdown, per-case results"></td>
+  </tr>
+</table>
+
+*Left: a project's pass-rate trend and run history. Right: a run that breached its quality gate,
+with the scorer breakdown and per-case results.*
+
 ## Documentation
 
 | Page | What it covers |

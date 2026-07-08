@@ -5,6 +5,8 @@ push to it. When a run breaches a gate (or errors), the server alerts your notif
 channels — Slack, a generic webhook, or email. This page wires a Slack alert end to end and then
 covers every knob along the way.
 
+![A run that breached its pass-rate gate: the run page shows the gate badge in red, the per-scorer breakdown, and per-case results](images/run-detail.png)
+
 ## End-to-end: Slack alert in four commands
 
 ```bash

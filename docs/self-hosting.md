@@ -104,6 +104,8 @@ setup form; this proves you're the operator (with filesystem access), not whoeve
 port first. Once the first admin account is created, `/setup` stops being reachable (it redirects to
 `/login`) for good.
 
+![The first-run setup wizard asking for the setup token, admin email, and password](images/setup-wizard.png)
+
 For scripted/headless installs, the admin CLI below does the same thing non-interactively:
 
 The server package installs a `tokensurf-server` console script (a Typer app). A fresh install
