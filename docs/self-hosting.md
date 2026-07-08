@@ -95,6 +95,17 @@ when it is missing.
 
 ## Bootstrapping with the admin CLI
 
+The fastest way to bootstrap a fresh install is the **web setup wizard**: start the server, then
+visit `http://<host>:<port>/setup`. While no dashboard user exists yet, every page redirects here
+automatically. The server prints the setup-token *file path* to its startup logs (default
+`./tokensurf_setup_token`, configurable via `TOKENSURF_SETUP_TOKEN_PATH`) — not the token itself, so
+the raw token never lands in log aggregation. Read the token from that file and paste it into the
+setup form; this proves you're the operator (with filesystem access), not whoever else reaches the
+port first. Once the first admin account is created, `/setup` stops being reachable (it redirects to
+`/login`) for good.
+
+For scripted/headless installs, the admin CLI below does the same thing non-interactively:
+
 The server package installs a `tokensurf-server` console script (a Typer app). A fresh install
 needs four commands:
 
@@ -160,6 +171,7 @@ directory (unknown variables are ignored).
 | `DATABASE_URL` | yes | — | SQLAlchemy connection URL used by the app and Alembic, e.g. `postgresql+psycopg://user:pass@host:5432/db`. Startup fails if unset. |
 | `TOKENSURF_SESSION_SECRET` | in practice (startup guard rejects the default) | `tokensurf-dev-secret-change-me` | Signs session cookies and CSRF tokens. The app refuses to start with the default or any value under 32 characters. |
 | `TOKENSURF_SECRET_KEY` | for secrets | unset | Passphrase (SHA-256 → Fernet key) encrypting channel secrets and provider keys at rest. Required for any secret write/read; raises `SecretKeyMissing` otherwise. |
+| `TOKENSURF_SETUP_TOKEN_PATH` | no | `./tokensurf_setup_token` | Path to the first-run setup-token file (see Bootstrapping). |
 | `TOKENSURF_CONFIG_RATE_LIMIT` | no | `30/60` | Per-project rate limit for `GET /api/v1/config`, as `count/window_seconds`. Exceeding it returns 429 with a `Retry-After` header. A count of 0 or below disables the limiter. Fixed at module import — setting it after the process starts has no effect; restart to change. |
 | `HOST` | no | `0.0.0.0` | Declared in settings but not consumed by an in-repo entrypoint; set the bind host with `uvicorn --host`. |
 | `PORT` | no | `8000` | Same as `HOST`; set the port with `uvicorn --port`. |

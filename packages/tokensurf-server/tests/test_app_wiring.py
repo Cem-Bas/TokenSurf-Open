@@ -2,6 +2,10 @@
 while the JSON ingest API and /healthz remain intact."""
 
 from fastapi.testclient import TestClient
+from tokensurf.core.ids import new_id
+
+from tokensurf_server.models import User
+from tokensurf_server.security import hash_password
 
 
 def _client(db_session):
@@ -17,6 +21,10 @@ def _client(db_session):
 
 
 def test_login_page_served(db_session):
+    # A user must exist so GET /login renders the login form (200, HTML)
+    # instead of redirecting to /setup on a fresh, unseeded DB.
+    db_session.add(User(id=new_id(), email="a@example.test", password_hash=hash_password("x")))
+    db_session.flush()
     app = _client(db_session)
     with TestClient(app) as client:
         resp = client.get("/login")

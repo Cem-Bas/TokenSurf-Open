@@ -14,6 +14,7 @@ __pycache__/
 # TokenSurf local artifacts
 *.sqlite
 results.jsonl
+tokensurf_setup_token
 
 # Coverage
 .coverage

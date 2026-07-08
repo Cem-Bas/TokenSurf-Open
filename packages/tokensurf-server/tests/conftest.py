@@ -16,6 +16,12 @@ import os
 # does not abort the suite. Production must NOT set this.
 os.environ.setdefault("TOKENSURF_ALLOW_INSECURE_SESSION_SECRET", "1")
 
+# Set a default DATABASE_URL if not provided (allows tests that don't need a real DB
+# to still instantiate Settings without errors).
+os.environ.setdefault(
+    "DATABASE_URL", "postgresql+psycopg://tokensurf:changeme@localhost:5432/tokensurf"
+)
+
 import pytest  # noqa: E402
 from sqlalchemy import create_engine as _create_engine  # noqa: E402
 from sqlalchemy.orm import Session  # noqa: E402
@@ -61,6 +67,24 @@ def db_session(engine):
 
 
 @pytest.fixture(autouse=True)
+def _isolate_setup_token_path(tmp_path, monkeypatch):
+    """Every test gets its own setup-token file location, so ordinary suite runs
+    never write to (or read stale state from) the real working directory.
+
+    Without this, `_lifespan`'s `get_or_create_token` call (triggered whenever a
+    TestClient's real ASGI lifespan runs with zero users, which is most tests)
+    would write a real, persistent `./tokensurf_setup_token` file into the cwd —
+    the package directory when the suite is run from there.
+    """
+    monkeypatch.setenv("TOKENSURF_SETUP_TOKEN_PATH", str(tmp_path / "tokensurf_setup_token"))
+    from tokensurf_server import config as server_config
+
+    server_config.get_settings.cache_clear()
+    yield
+    server_config.get_settings.cache_clear()
+
+
+@pytest.fixture(autouse=True)
 def _reset_rate_limiters():
     """Clear the per-process rate limiters before each test.
 
@@ -73,5 +97,6 @@ def _reset_rate_limiters():
 
     routes._login_limiter.clear()
     routes._login_email_limiter.clear()
+    routes._setup_limiter.clear()
     ingest._config_limiter.clear()
     yield

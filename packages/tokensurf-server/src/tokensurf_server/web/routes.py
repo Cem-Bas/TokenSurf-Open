@@ -8,6 +8,7 @@ All other context variables (labels, case input/output, trace) are autoescaped.
 from __future__ import annotations
 
 import logging
+import secrets
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -15,17 +16,20 @@ from fastapi import APIRouter, Depends, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
+from tokensurf.core.ids import new_id
 
 import tokensurf_server.notify as _notify
 from tokensurf_server import audit_service as audit_service
-from tokensurf_server.auth import SESSION_COOKIE, login_required, make_session
+from tokensurf_server.auth import SESSION_COOKIE, any_user_exists, login_required, make_session
 from tokensurf_server.config import get_settings
 from tokensurf_server.crypto import encrypt
 from tokensurf_server.db import get_session
 from tokensurf_server.models import NotificationChannel, Project, QualityGate, User
 from tokensurf_server.ratelimit import SlidingWindowLimiter, parse_rate
 from tokensurf_server.security import hash_password, verify_password
+from tokensurf_server.setup_token import get_or_create_token
 from tokensurf_server.web.charts import distribution_bars, trend_svg
 from tokensurf_server.web.csrf import CSRF_COOKIE
 from tokensurf_server.web.csrf import verify as verify_csrf
@@ -51,6 +55,14 @@ templates = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
 _login_count, _login_window = parse_rate(get_settings().login_rate_limit)
 _login_limiter = SlidingWindowLimiter(_login_count, _login_window)
 _login_email_limiter = SlidingWindowLimiter(_login_count, _login_window)
+
+# Brute-force throttle for POST /setup, IP-keyed only: unlike login there's no
+# "account" to key a second limiter on (the setup token isn't tied to an email until
+# the account is created). Reuses login_rate_limit rather than adding a new config
+# knob — this is conceptually the same guard (throttling repeated auth-secret
+# guesses against a single, security-critical endpoint).
+_setup_count, _setup_window = parse_rate(get_settings().login_rate_limit)
+_setup_limiter = SlidingWindowLimiter(_setup_count, _setup_window)
 
 # Precomputed once so login does the same PBKDF2 work whether or not the email
 # exists — closing the timing oracle that would otherwise enumerate valid emails.
@@ -80,8 +92,84 @@ def _require_csrf(request: Request, csrf_token: str) -> None:
 # ---------------------------------------------------------------------------
 
 
+@router.get("/setup", response_class=HTMLResponse)
+def get_setup(request: Request, session: Session = Depends(get_session)) -> Response:  # noqa: B008
+    if any_user_exists(session):
+        return RedirectResponse("/login", status_code=303)
+    return templates.TemplateResponse(
+        request,
+        "setup.html",
+        {"error": None, "setup_token_path": get_settings().setup_token_path},
+    )
+
+
+@router.post("/setup")
+def post_setup(
+    request: Request,
+    token: str = Form(...),
+    email: str = Form(...),
+    password: str = Form(...),
+    csrf_token: str = Form(default=""),
+    session: Session = Depends(get_session),  # noqa: B008
+) -> Response:
+    # CSRF check first (matching post_login's ordering).
+    _require_csrf(request, csrf_token)
+    # Throttle setup-token brute force per client IP (mirrors post_login's IP limiter;
+    # setup has no "account" to key a second limiter on the way login keys on email).
+    client_ip = request.client.host if request.client else "unknown"
+    if not _setup_limiter.allow(client_ip):
+        raise HTTPException(
+            status_code=429,
+            detail="Too many setup attempts",
+            headers={"Retry-After": str(_setup_limiter.retry_after(client_ip))},
+        )
+    expected_token = get_or_create_token(Path(get_settings().setup_token_path))
+    # Encode to bytes: compare_digest(str, str) raises TypeError on non-ASCII input,
+    # which would otherwise surface as an unhandled 500 for a malformed request.
+    if not secrets.compare_digest(token.encode(), expected_token.encode()):
+        return templates.TemplateResponse(
+            request,
+            "setup.html",
+            {
+                "error": "Invalid setup token",
+                "setup_token_path": get_settings().setup_token_path,
+            },
+            status_code=401,
+        )
+    user = User(id=new_id(), email=email, password_hash=hash_password(password))
+    # TOCTOU re-check immediately before the commit — as close to the write as
+    # possible so a second submission racing this one (both starting while no user
+    # exists) can't both succeed. hash_password() above is ~240k PBKDF2 iterations;
+    # doing the re-check here (vs. at function entry) minimizes, though doesn't
+    # eliminate, the check-then-act race window. A true fix needs a DB-level unique
+    # constraint or advisory lock — out of scope here.
+    if any_user_exists(session):
+        return RedirectResponse("/login", status_code=303)
+    session.add(user)
+    try:
+        session.commit()
+    except IntegrityError:
+        # A second concurrent submission (e.g. a double-click) won the TOCTOU race and
+        # committed first — this commit hit the unique constraint on User.email. The
+        # account was almost certainly just created successfully by that other request,
+        # so send the operator to /login rather than surfacing a 500.
+        session.rollback()
+        return RedirectResponse("/login", status_code=303)
+    resp = RedirectResponse("/", status_code=303)
+    resp.set_cookie(
+        SESSION_COOKIE,
+        make_session(user.id),
+        httponly=True,
+        samesite="lax",
+        secure=get_settings().secure_cookies,
+    )
+    return resp
+
+
 @router.get("/login", response_class=HTMLResponse)
-def get_login(request: Request) -> HTMLResponse:
+def get_login(request: Request, session: Session = Depends(get_session)) -> Response:  # noqa: B008
+    if not any_user_exists(session):
+        return RedirectResponse("/setup", status_code=303)
     return templates.TemplateResponse(request, "login.html", {"error": None})
 
 

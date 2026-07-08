@@ -1,3 +1,4 @@
+import logging
 import os
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
@@ -5,15 +6,19 @@ from pathlib import Path
 
 from fastapi import Depends, FastAPI
 from fastapi.staticfiles import StaticFiles
-from sqlalchemy import text
+from sqlalchemy import func, select, text
 from sqlalchemy.orm import Session
 
 from tokensurf_server.config import get_settings
-from tokensurf_server.db import get_engine, get_session
+from tokensurf_server.db import get_engine, get_session, get_sessionmaker
 from tokensurf_server.ingest import router
+from tokensurf_server.models import User
 from tokensurf_server.security_config import _parse_bool_env, validate_security_config
+from tokensurf_server.setup_token import get_or_create_token
 from tokensurf_server.web.csrf import CsrfMiddleware
 from tokensurf_server.web.routes import router as web_router
+
+log = logging.getLogger(__name__)
 
 _STATIC_DIR = Path(__file__).parent / "web" / "static"
 
@@ -32,6 +37,16 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
         settings,
         allow_insecure=_parse_bool_env(os.environ.get("TOKENSURF_ALLOW_INSECURE_SESSION_SECRET")),
     )
+    with get_sessionmaker()() as session:
+        user_count = session.scalar(select(func.count(User.id))) or 0
+    if user_count == 0:
+        get_or_create_token(Path(settings.setup_token_path))
+        log.info(
+            "First-run setup: create the admin account at http://%s:%s/setup using the token in %s",
+            settings.host,
+            settings.port,
+            settings.setup_token_path,
+        )
     yield
 
 
