@@ -1,16 +1,19 @@
 """Tests for the dynamic `tokensurf server` sub-app attachment.
 
-This monorepo dev environment always has both `tokensurf` and `tokensurf-server`
-installed (uv workspace sync), so `server` must always appear here. The
-ModuleNotFoundError guard itself (no `tokensurf_server` installed -> no `server`
-group) is exercised structurally by inspecting the guard's source, since building
-a second venv without tokensurf-server is out of scope for this test suite.
+When `tokensurf-server` is installed alongside (full workspace sync), the `server`
+group must appear; the library-only CI job syncs just this package, so those tests
+skip there. The ModuleNotFoundError guard itself (no `tokensurf_server` installed
+-> no `server` group) is exercised structurally by inspecting the guard's source,
+since building a second venv without tokensurf-server is out of scope for this
+test suite.
 """
 
 from __future__ import annotations
 
+import importlib.util
 import inspect
 
+import pytest
 from typer.testing import CliRunner
 
 from tokensurf import cli
@@ -18,13 +21,20 @@ from tokensurf.cli import app
 
 runner = CliRunner()
 
+requires_server = pytest.mark.skipif(
+    importlib.util.find_spec("tokensurf_server") is None,
+    reason="tokensurf-server is not installed in this environment",
+)
 
+
+@requires_server
 def test_server_group_appears_when_tokensurf_server_installed() -> None:
     result = runner.invoke(app, ["--help"])
     assert result.exit_code == 0, result.output
     assert "server" in result.output
 
 
+@requires_server
 def test_server_subcommands_are_reachable() -> None:
     result = runner.invoke(app, ["server", "--help"])
     assert result.exit_code == 0, result.output

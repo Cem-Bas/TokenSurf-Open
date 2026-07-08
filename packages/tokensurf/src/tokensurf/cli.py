@@ -20,7 +20,10 @@ eval_app = typer.Typer(help="Run and report agent evaluations.")
 app.add_typer(eval_app, name="eval")
 
 try:
-    from tokensurf_server.admin_cli import app as _server_app
+    # Optional dependency: only importable when tokensurf-server is installed too.
+    from tokensurf_server.admin_cli import (  # pyright: ignore[reportMissingImports]
+        app as _server_app,
+    )
 except ModuleNotFoundError:
     _server_app = None
 

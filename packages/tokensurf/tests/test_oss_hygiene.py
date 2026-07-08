@@ -36,7 +36,9 @@ def test_env_example_has_placeholders_only():
 def test_readme_is_gate_safe():
     text = (ROOT / "README.md").read_text(encoding="utf-8")
     assert "Apache-2.0" in text
-    assert "launching soon" in text.lower()
+    # Until the first tagged release ships to PyPI, the README must disclose both.
+    assert "pre-1.0" in text.lower()
+    assert "not yet on pypi" in text.lower()
 
 
 def test_internal_engineering_docs_not_tracked():
