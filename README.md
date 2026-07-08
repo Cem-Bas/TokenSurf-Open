@@ -1,6 +1,8 @@
 <div align="center">
 
-# 🏄 TokenSurf
+<img src="docs/images/logo.png" alt="TokenSurf logo" width="440">
+
+# TokenSurf
 
 **pytest for AI agents — score, evaluate, and gate agent quality, entirely on your own infrastructure.**
 
