@@ -23,8 +23,9 @@ the bare command names; prefix them with the matching `uv run --directory` invoc
 
 ## tokensurf — evaluation CLI
 
-Typer app with one command group, `eval` ("Run and report agent evaluations."). There is no
-standalone `push` command — pushing to a server happens as part of `tokensurf eval run`.
+Typer app with an `init` scaffolding command and one command group, `eval` ("Run and report agent
+evaluations."). There is no standalone `push` command — pushing to a server happens as part of
+`tokensurf eval run`.
 
 ### tokensurf eval run
 
@@ -134,6 +135,40 @@ Cases: 2
   c2         ExactMatch       FAIL   0.000
   c2         LatencyUnder     PASS   1.000
 ```
+
+### tokensurf init
+
+```bash
+tokensurf init [DIRECTORY] [--force]
+```
+
+Scaffolds a runnable starter project: two example eval files and a pytest CI gate.
+
+| Argument / option | Default           | Description                                        |
+| ----------------- | ----------------- | -------------------------------------------------- |
+| `DIRECTORY`       | `tokensurf-tests` | Directory to scaffold into.                        |
+| `--force`         | off               | Overwrite files that already exist in the target.  |
+
+```bash
+uv run tokensurf init my-tests
+```
+
+```text
+Created 4 files in my-tests/:
+  my-tests/evals/example_deterministic.py
+  my-tests/evals/example_llm_judge.py
+  my-tests/evals/test_agent_quality.py
+  my-tests/README.md
+
+Next steps:
+  cd my-tests
+  tokensurf eval run evals/example_deterministic.py
+  pytest evals/
+```
+
+Both examples run entirely offline: `example_deterministic.py` uses deterministic and trajectory
+scorers, and `example_llm_judge.py` wires an `LLMJudge` to a fake client so no provider key is
+needed. Without `--force`, the command refuses to overwrite existing files and exits 1.
 
 ## tokensurf-server — admin CLI
 

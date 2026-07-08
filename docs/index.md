@@ -81,7 +81,7 @@ scorer errors). The full reference, including constructor arguments for each sco
                            +-----------------------+        | Slack/webhook/email    |
                                      ^                      | encrypted judge keys   |
                                      |                      +------------+-----------+
-                                     +--- config pull (judge keys) -----+
+                                     +--- config pull (judge keys) ------+
 ```
 
 The SDK and eval harness are fully usable on their own — results print to the console and write to
