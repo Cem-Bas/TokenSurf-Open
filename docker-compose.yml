@@ -4,6 +4,7 @@
 #   docker compose up
 #   # Server is at http://localhost:8000
 #   # Postgres is at localhost:5432
+#   # If 5432 is busy: TOKENSURF_POSTGRES_PORT=54325 docker compose up
 #
 # ⚠  DEV PLACEHOLDER CREDENTIALS below — change every "changeme" value
 #    before any non-local or production use.
@@ -23,7 +24,7 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:
-      - "5432:5432"
+      - "${TOKENSURF_POSTGRES_PORT:-5432}:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U tokensurf"]
       interval: 10s

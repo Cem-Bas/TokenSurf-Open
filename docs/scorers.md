@@ -2,7 +2,7 @@
 
 Scorers grade a single agent run — a `Trace` — and return a `ScoreResult` with a value normalized
 to 0–1. You attach a list of scorers to `evaluate()` and every case in your dataset is graded by
-every scorer. TokenSurf ships 14 built-in scorers in four families, and you can write your own.
+every scorer. TokenSurf ships 17 built-in scorers in five families, and you can write your own.
 
 ```python
 import tokensurf as ts
@@ -76,6 +76,9 @@ stays in the denominator and therefore lowers the pass rate.
 | Deterministic | `LatencyUnder`        | `LatencyUnder(seconds)`                                                  | `trace.duration < seconds`                               |
 | Deterministic | `CostUnder`           | `CostUnder(usd)`                                                         | summed span costs `< usd`                                |
 | Deterministic | `ToolCalled`          | `ToolCalled(name)`                                                       | a tool span with that name exists                        |
+| Security      | `ForbiddenToolCalled` | `ForbiddenToolCalled(forbidden)`                                         | no forbidden tool was called                             |
+| Security      | `NoCanaryLeak`        | `NoCanaryLeak(canaries, scan_tool_inputs=True)`                           | canaries are absent from final output and tool inputs    |
+| Security      | `ApprovalRequired`    | `ApprovalRequired(tools)`                                                 | every protected tool call has a prior granted approval   |
 | LLM judge     | `LLMJudge`            | `LLMJudge(criteria="overall quality", model="gpt-4o-mini", client=None, threshold=0.7, prompt=None, max_retries=2)` | judge rating / 10 `>= threshold` |
 | Reference     | `EmbeddingSimilarity` | `EmbeddingSimilarity(model="text-embedding-3-small", client=None, threshold=0.8)` | clamped cosine similarity `>= threshold`      |
 | Trajectory    | `ToolSequence`        | `ToolSequence(expected, strict=False)`                                   | expected tool names appear in order (or exactly)         |
@@ -301,6 +304,60 @@ results, never exceptions.
 ```python
 ts.EmbeddingSimilarity(threshold=0.85)   # needs case.expected on each case
 ```
+
+## Security scorers
+
+These deterministic checks grade declared security invariants over the same traces as every other
+scorer. They make no network or model call and live in `tokensurf.scorers.security`. For a complete
+runnable workflow, see [Agent security testing](security-testing.md).
+
+### ForbiddenToolCalled
+
+```python
+ForbiddenToolCalled(forbidden: str | Collection[str])
+```
+
+Fails if a `type="tool"` span has a name in `forbidden`. Custom spans with the same name do not
+count. `raw["violations"]` preserves the attempted tool names in order, including repeats.
+
+```python
+ts.ForbiddenToolCalled({"shell", "delete_user"})
+```
+
+### NoCanaryLeak
+
+```python
+NoCanaryLeak(canaries: str | Collection[str], *, scan_tool_inputs: bool = True)
+```
+
+Fails when a synthetic canary appears in the agent's final output or, by default, any tool input.
+Scanning tool inputs catches exfiltration through actions such as email or HTTP tools. Internal
+tool outputs are deliberately not scanned: retrieving a protected value internally is different
+from exposing it. Set `scan_tool_inputs=False` to check only final output.
+
+The result reports locations and a match count but never copies canary values into the report.
+Use test-only canaries rather than real credentials.
+
+```python
+ts.NoCanaryLeak("TS_CANARY_test-only")
+```
+
+### ApprovalRequired
+
+```python
+ApprovalRequired(tools: str | Collection[str])
+```
+
+Fails when a protected tool runs without a preceding granted approval span. Use `@ts.approval`
+to record those spans. A denied or late approval does not count, and each grant authorizes one
+subsequent protected call.
+
+```python
+ts.ApprovalRequired({"send_email", "delete_user"})
+```
+
+These are regression checks, not a production sandbox: they report what happened in a test trace
+and do not intercept an action before it executes.
 
 ## Trajectory scorers
 

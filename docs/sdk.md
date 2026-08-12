@@ -1,7 +1,8 @@
 # SDK reference
 
-The `tokensurf` package has two halves: a capture SDK (`@track`, `span()`, sinks) that records each
-agent run as a `Trace`, and an offline eval harness (`Dataset`, `evaluate()`, `assert_eval`) that
+The `tokensurf` package has two halves: a capture SDK (`@track`, `@tool`, `@approval`, `span()`,
+sinks) that records each agent run as a `Trace`, and an offline eval harness (`Dataset`,
+`evaluate()`, `assert_eval`) that
 runs a task over a dataset and grades every captured trace with scorers. This page documents both,
 plus the data models they share. For the scorer catalog see [Scorers](scorers.md); for the
 `tokensurf eval` commands see [CLI](cli.md).
@@ -41,7 +42,7 @@ The names below are importable directly from the top-level `tokensurf` namespace
 
 | Name | Kind |
 | --- | --- |
-| `track`, `span`, `current_trace` | capture SDK |
+| `track`, `tool`, `approval`, `span`, `current_trace` | capture SDK |
 | `Dataset`, `evaluate` | eval harness |
 | `assert_eval` | pytest helper |
 | `Trace`, `Span`, `Case`, `ScoreResult`, `EvalReport` | data models |
@@ -126,6 +127,44 @@ On an exception inside the block, `sp.error = repr(exc)` is set and the exceptio
 Scorers that match on tool spans — `ToolCalled` (deterministic family) and trajectory scorers
 such as `ToolSequence` — match on span `type` and `name`, so give tool spans `type="tool"` and
 stable names.
+
+### `@tool`
+
+```python
+def tool(fn=None, *, name: str | None = None,
+         attributes: dict[str, Any] | None = None)
+```
+
+Wrap a tool function so calls inside an active trace automatically become `type="tool"` spans.
+The decorator records positional and keyword arguments as the span input, the return value as its
+output, and any exception through the normal `span()` error path. Outside an active trace it is
+transparent: the function still runs normally and the orphan span is discarded.
+
+```python
+@ts.tool(name="docs.search", attributes={"network": False})
+def search_docs(query: str, *, limit: int = 3):
+    return search(query, limit=limit)
+```
+
+Tool inputs and outputs become part of the trace. Do not pass real production secrets merely to
+test leak detection; use synthetic canary values.
+
+### `@approval`
+
+```python
+def approval(fn=None, *, for_tool: str, name: str | None = None)
+```
+
+Wrap a function that asks for or resolves approval for a protected tool. Its return value is
+interpreted with `bool(...)`; the span records `approval_for` and `approval_granted` attributes.
+`ApprovalRequired` consumes one prior granted approval per protected tool call, so approval must
+occur before the action and cannot authorize unlimited later actions.
+
+```python
+@ts.approval(for_tool="send_email")
+def confirm_send() -> bool:
+    return user_clicked_confirm()
+```
 
 ### `current_trace()`
 

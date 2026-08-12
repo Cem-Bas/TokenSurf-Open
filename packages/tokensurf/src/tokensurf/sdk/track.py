@@ -55,6 +55,62 @@ def track(fn=None, *, name: str | None = None, sink: Sink | None = None):
     return decorator
 
 
+def _call_input(args: tuple[Any, ...], kwargs: dict[str, Any]) -> Any:
+    """Keep common tool calls readable while preserving all supplied arguments."""
+    if len(args) == 1 and not kwargs:
+        return args[0]
+    if not args:
+        return dict(kwargs)
+    return {"args": list(args), "kwargs": dict(kwargs)}
+
+
+def tool(
+    fn=None,
+    *,
+    name: str | None = None,
+    attributes: dict[str, Any] | None = None,
+):
+    """Record a function call as a tool span when it runs inside a trace."""
+
+    def decorator(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            with span(name or func.__name__, type="tool", input=_call_input(args, kwargs)) as sp:
+                if attributes:
+                    sp.attributes.update(attributes)
+                result = func(*args, **kwargs)
+                sp.output = result
+                return result
+
+        return wrapper
+
+    if fn is not None:
+        return decorator(fn)
+    return decorator
+
+
+def approval(fn=None, *, for_tool: str, name: str | None = None):
+    """Record whether an approval function granted a later protected tool call."""
+    if not for_tool:
+        raise ValueError("for_tool must not be empty")
+
+    def decorator(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            with span(name or func.__name__, type="custom", input=_call_input(args, kwargs)) as sp:
+                sp.attributes["approval_for"] = for_tool
+                result = func(*args, **kwargs)
+                sp.output = result
+                sp.attributes["approval_granted"] = bool(result)
+                return result
+
+        return wrapper
+
+    if fn is not None:
+        return decorator(fn)
+    return decorator
+
+
 @contextmanager
 def span(name: str, *, type: SpanType = "custom", input: Any = None) -> Iterator[Span]:
     trace = _CURRENT.get()

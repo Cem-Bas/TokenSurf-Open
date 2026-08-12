@@ -1,7 +1,7 @@
 import pytest
 
 from tokensurf.core.models import Trace
-from tokensurf.sdk.track import current_trace, span, track
+from tokensurf.sdk.track import approval, current_trace, span, tool, track
 
 
 class ListSink:
@@ -129,3 +129,91 @@ def test_sink_raising_never_breaks_wrapped_function():
 
     # The sink blows up internally, but the user's result is returned cleanly.
     assert agent("ab") == "abab"
+
+
+def test_tool_decorator_records_call_and_attributes():
+    sink = ListSink()
+
+    @tool(name="docs.search", attributes={"network": False})
+    def search(query, *, limit=3):
+        return [query] * limit
+
+    @track(sink=sink)
+    def agent(question):
+        return search(question, limit=2)
+
+    assert agent("security") == ["security", "security"]
+    recorded = sink.traces[0].spans[0]
+    assert recorded.type == "tool"
+    assert recorded.name == "docs.search"
+    assert recorded.input == {"args": ["security"], "kwargs": {"limit": 2}}
+    assert recorded.output == ["security", "security"]
+    assert recorded.attributes == {"network": False}
+
+
+def test_tool_decorator_records_error_then_reraises():
+    sink = ListSink()
+
+    @tool
+    def explode(value):
+        raise ValueError(value)
+
+    @track(sink=sink)
+    def agent(question):
+        return explode(question)
+
+    with pytest.raises(ValueError, match="bad"):
+        agent("bad")
+
+    recorded = sink.traces[0].spans[0]
+    assert recorded.name == "explode"
+    assert recorded.error is not None
+    assert "bad" in recorded.error
+
+
+def test_tool_decorator_is_transparent_outside_trace():
+    @tool
+    def double(value):
+        return value * 2
+
+    assert double(4) == 8
+    assert current_trace() is None
+
+
+def test_approval_decorator_records_grant_for_protected_tool():
+    sink = ListSink()
+
+    @approval(for_tool="send_email")
+    def user_approved():
+        return True
+
+    @track(sink=sink)
+    def agent(question):
+        return user_approved()
+
+    assert agent("send it") is True
+    recorded = sink.traces[0].spans[0]
+    assert recorded.type == "custom"
+    assert recorded.name == "user_approved"
+    assert recorded.output is True
+    assert recorded.attributes == {
+        "approval_for": "send_email",
+        "approval_granted": True,
+    }
+
+
+def test_approval_decorator_records_denial():
+    sink = ListSink()
+
+    @approval(for_tool="delete_user", name="confirm-delete")
+    def user_approved():
+        return False
+
+    @track(sink=sink)
+    def agent(question):
+        return user_approved()
+
+    assert agent("delete") is False
+    recorded = sink.traces[0].spans[0]
+    assert recorded.name == "confirm-delete"
+    assert recorded.attributes["approval_granted"] is False

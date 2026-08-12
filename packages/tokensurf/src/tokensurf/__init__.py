@@ -33,6 +33,9 @@ from tokensurf.scorers.llm import LLMJudge
 # if the optional 'reference' extra is absent — only raises on actual score() call)
 from tokensurf.scorers.reference import EmbeddingSimilarity
 
+# Scorers — security
+from tokensurf.scorers.security import ApprovalRequired, ForbiddenToolCalled, NoCanaryLeak
+
 # Scorers — trajectory
 from tokensurf.scorers.trajectory import (
     NoLoops,
@@ -43,7 +46,7 @@ from tokensurf.scorers.trajectory import (
 )
 
 # SDK tracking helpers
-from tokensurf.sdk.track import current_trace, span, track
+from tokensurf.sdk.track import approval, current_trace, span, tool, track
 
 __all__ = [
     "__version__",
@@ -64,6 +67,9 @@ __all__ = [
     "ToolCalled",
     "LLMJudge",
     "EmbeddingSimilarity",
+    "ForbiddenToolCalled",
+    "NoCanaryLeak",
+    "ApprovalRequired",
     "ToolSequence",
     "NoLoops",
     "StepBudget",
@@ -71,6 +77,8 @@ __all__ = [
     "Recovery",
     # sdk
     "track",
+    "tool",
+    "approval",
     "span",
     "current_trace",
     # eval

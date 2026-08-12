@@ -10,6 +10,7 @@ from tokensurf.scorers.deterministic import (
 )
 from tokensurf.scorers.llm import LiteLLMClient, LLMClient, LLMJudge, LLMResponse
 from tokensurf.scorers.reference import EmbeddingSimilarity
+from tokensurf.scorers.security import ApprovalRequired, ForbiddenToolCalled, NoCanaryLeak
 from tokensurf.scorers.trajectory import (
     NoLoops,
     Recovery,
@@ -35,6 +36,9 @@ __all__ = [
     "ToolCalled",
     "LLMJudge",
     "EmbeddingSimilarity",
+    "ForbiddenToolCalled",
+    "NoCanaryLeak",
+    "ApprovalRequired",
     "ToolSequence",
     "NoLoops",
     "StepBudget",

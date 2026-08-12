@@ -20,6 +20,9 @@ EXPECTED_NAMES = [
     "ToolCalled",
     "LLMJudge",
     "EmbeddingSimilarity",
+    "ForbiddenToolCalled",
+    "NoCanaryLeak",
+    "ApprovalRequired",
     "ToolSequence",
     "NoLoops",
     "StepBudget",
@@ -27,6 +30,8 @@ EXPECTED_NAMES = [
     "Recovery",
     # sdk
     "track",
+    "tool",
+    "approval",
     "span",
     "current_trace",
     # eval
