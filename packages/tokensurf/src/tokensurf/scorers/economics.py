@@ -76,9 +76,7 @@ class PaymentCostUnder(Scorer):
             cost=total,
             raw=raw,
             explanation=(
-                None
-                if ok
-                else f"settled payment cost ${total:.6f} is not under ${self.usd:.6f}"
+                None if ok else f"settled payment cost ${total:.6f} is not under ${self.usd:.6f}"
             ),
         )
 
