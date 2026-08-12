@@ -44,6 +44,7 @@ nav:
   - Guides:
       - SDK reference: sdk.md
       - Scorers: scorers.md
+      - Economics & x402: economics.md
       - CLI reference: cli.md
   - Security:
       - Agent security testing: security-testing.md

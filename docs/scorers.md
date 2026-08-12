@@ -2,7 +2,7 @@
 
 Scorers grade a single agent run — a `Trace` — and return a `ScoreResult` with a value normalized
 to 0–1. You attach a list of scorers to `evaluate()` and every case in your dataset is graded by
-every scorer. TokenSurf ships 17 built-in scorers in five families, and you can write your own.
+every scorer. TokenSurf ships 20 built-in scorers in six families, and you can write your own.
 
 ```python
 import tokensurf as ts
@@ -79,6 +79,9 @@ stays in the denominator and therefore lowers the pass rate.
 | Security      | `ForbiddenToolCalled` | `ForbiddenToolCalled(forbidden)`                                         | no forbidden tool was called                             |
 | Security      | `NoCanaryLeak`        | `NoCanaryLeak(canaries, scan_tool_inputs=True)`                           | canaries are absent from final output and tool inputs    |
 | Security      | `ApprovalRequired`    | `ApprovalRequired(tools)`                                                 | every protected tool call has a prior granted approval   |
+| Economics     | `PaymentCostUnder`    | `PaymentCostUnder(usd)`                                                   | settled, USD-priced payments total `< usd`               |
+| Economics     | `PaymentCountAtMost`  | `PaymentCountAtMost(max_payments)`                                        | settled payment count is within the limit                |
+| Economics     | `PaymentRecipientsAllowed` | `PaymentRecipientsAllowed(recipients)`                              | every payment attempt targets an allowed recipient       |
 | LLM judge     | `LLMJudge`            | `LLMJudge(criteria="overall quality", model="gpt-4o-mini", client=None, threshold=0.7, prompt=None, max_retries=2)` | judge rating / 10 `>= threshold` |
 | Reference     | `EmbeddingSimilarity` | `EmbeddingSimilarity(model="text-embedding-3-small", client=None, threshold=0.8)` | clamped cosine similarity `>= threshold`      |
 | Trajectory    | `ToolSequence`        | `ToolSequence(expected, strict=False)`                                   | expected tool names appear in order (or exactly)         |
@@ -358,6 +361,55 @@ ts.ApprovalRequired({"send_email", "delete_user"})
 
 These are regression checks, not a production sandbox: they report what happened in a test trace
 and do not intercept an action before it executes.
+
+## Economics scorers
+
+These deterministic checks enforce spending behavior over payment spans recorded with
+`ts.record_payment(...)`. They make no network or model call and live in
+`tokensurf.scorers.economics`. The [Economics guide](economics.md) shows a complete x402-oriented
+workflow and the self-hosted dashboard.
+
+### PaymentCostUnder
+
+```python
+PaymentCostUnder(usd: float)
+```
+
+Sums `payment.amount_usd` for successful settlements and passes when the total is strictly below
+`usd`. Failed attempts do not count as spent money. If any successful payment has no valid
+explicit USD amount, the scorer returns an errored no-verdict instead of silently understating
+cost.
+
+```python
+ts.PaymentCostUnder(usd=0.10)
+```
+
+### PaymentCountAtMost
+
+```python
+PaymentCountAtMost(max_payments: int)
+```
+
+Passes when the number of successful settlements is at most `max_payments`. Failed attempts remain
+visible in the dashboard but do not consume this settlement count.
+
+```python
+ts.PaymentCountAtMost(max_payments=3)
+```
+
+### PaymentRecipientsAllowed
+
+```python
+PaymentRecipientsAllowed(recipients: str | Collection[str])
+```
+
+Checks every recorded payment attempt, including failed attempts, and fails when the recipient is
+missing or outside the allowlist. Checking attempts helps catch an agent trying an unintended
+destination even when settlement fails.
+
+```python
+ts.PaymentRecipientsAllowed({"0xmerchant", "0xbackup"})
+```
 
 ## Trajectory scorers
 

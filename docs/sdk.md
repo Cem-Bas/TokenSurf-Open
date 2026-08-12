@@ -1,6 +1,7 @@
 # SDK reference
 
-The `tokensurf` package has two halves: a capture SDK (`@track`, `@tool`, `@approval`, `span()`,
+The `tokensurf` package has two halves: a capture SDK (`@track`, `@tool`, `@approval`,
+`record_payment()`, `span()`,
 sinks) that records each agent run as a `Trace`, and an offline eval harness (`Dataset`,
 `evaluate()`, `assert_eval`) that
 runs a task over a dataset and grades every captured trace with scorers. This page documents both,
@@ -42,7 +43,7 @@ The names below are importable directly from the top-level `tokensurf` namespace
 
 | Name | Kind |
 | --- | --- |
-| `track`, `tool`, `approval`, `span`, `current_trace` | capture SDK |
+| `track`, `tool`, `approval`, `record_payment`, `span`, `current_trace` | capture SDK |
 | `Dataset`, `evaluate` | eval harness |
 | `assert_eval` | pytest helper |
 | `Trace`, `Span`, `Case`, `ScoreResult`, `EvalReport` | data models |
@@ -165,6 +166,42 @@ occur before the action and cannot authorize unlimited later actions.
 def confirm_send() -> bool:
     return user_clicked_confirm()
 ```
+
+### `record_payment()`
+
+```python
+def record_payment(
+    *, amount_usd: float | None = None, protocol: str = "x402",
+    amount: str | int | None = None, asset: str | None = None,
+    network: str | None = None, recipient: str | None = None,
+    payer: str | None = None, success: bool = True,
+    transaction: str | None = None,
+) -> Span
+```
+
+Record a payment result as a custom span inside the current trace. TokenSurf does not wrap a
+specific payment client: call this after your x402 or other payment client returns its settlement
+result.
+
+```python
+ts.record_payment(
+    amount="25000",              # protocol-native amount or base units
+    amount_usd=0.025,            # explicit conversion supplied by your app
+    asset="USDC",
+    network="eip155:8453",
+    recipient="0xmerchant",
+    success=True,
+    transaction="0x...",
+)
+```
+
+`amount` and `amount_usd` are deliberately separate. TokenSurf never guesses a USD conversion
+for a native amount, so unlike assets are not silently added. A successful payment with
+`amount_usd` also sets the span's generic `cost` attribute, which means the existing `CostUnder`
+scorer includes it. Failed attempts remain visible but do not count as spent money.
+
+Do not record payment signatures, authorization headers, private keys, or other secrets. Traces
+can be rendered in the dashboard or exported.
 
 ### `current_trace()`
 

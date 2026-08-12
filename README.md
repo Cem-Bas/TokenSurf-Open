@@ -10,7 +10,7 @@
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 ![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)
 
-[Quickstart](docs/quickstart.md) · [Scorers](docs/scorers.md) · [SDK](docs/sdk.md) · [Self-hosting](docs/self-hosting.md) · [Security model](docs/security.md)
+[Quickstart](docs/quickstart.md) · [Scorers](docs/scorers.md) · [Economics](docs/economics.md) · [SDK](docs/sdk.md) · [Self-hosting](docs/self-hosting.md) · [Security model](docs/security.md)
 
 *Pre-1.0 — not yet on PyPI; install from source.*
 
@@ -23,7 +23,7 @@ quality drops with **no failing test to catch it**. TokenSurf gives your agents 
 the rest of your code already has:
 
 - a **capture SDK** records each agent run as a trace,
-- **17 scorers** grade traces from 0.0 to 1.0, including security invariants,
+- **20 scorers** grade traces from 0.0 to 1.0, including security and economics invariants,
 - an **offline eval harness** turns datasets of cases into pass/fail verdicts you enforce in CI,
 - an optional **self-hosted server** adds a dashboard, quality gates, and alerts.
 
@@ -228,7 +228,8 @@ with the scorer breakdown and per-case results.*
 | [What is TokenSurf](docs/index.md) | Overview, architecture, and how the pieces fit together |
 | [Quickstart](docs/quickstart.md) | Fresh clone to a scored eval, then pushing runs to a server |
 | [SDK reference](docs/sdk.md) | Decorators, spans, sinks, `Dataset`, `evaluate()`, `assert_eval` |
-| [Scorers](docs/scorers.md) | The 17 built-in scorers in five families, and writing your own |
+| [Scorers](docs/scorers.md) | The 20 built-in scorers in six families, and writing your own |
+| [Economics](docs/economics.md) | Agent payment capture, x402-oriented budgets, and cost tracking |
 | [CLI reference](docs/cli.md) | `tokensurf init` / `eval run` / `eval report`; `tokensurf-server` admin |
 | [Self-hosting](docs/self-hosting.md) | Compose or manual install, setup wizard, production setup |
 | [Gates & alerts](docs/quality-gates.md) | Per-project quality gates; Slack/webhook/email alerts |

@@ -234,7 +234,7 @@ verdict comes only from `assert_eval`.
 
 ## Next steps
 
-- [Scorers](scorers.md) — the five scorer families (deterministic, security, LLM judge,
+- [Scorers](scorers.md) — the six scorer families (deterministic, security, economics, LLM judge,
   reference-based, trajectory) and how to write your own.
 - `packages/tokensurf/examples/quickstart_eval.py` — the repo's canonical variant of this eval,
   which adds an `LLMJudge` scorer backed by an offline `FakeLLMClient` (no provider key needed).

@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+{% block title %}Economics — TokenSurf{% endblock %}
+
+{% block content %}
+<div class="page economics-page">
+  <div class="page-header economics-header">
+    <div>
+      <h1 class="page-title">Economics</h1>
+      <p class="page-sub">Payment activity across evaluated agent runs.</p>
+    </div>
+    <span class="protocol-badge">x402 capture</span>
+  </div>
+
+  <div class="stats-grid economics-stats">
+    <div class="stat-tile" style="--tile-color:var(--green)">
+      <div class="stat-label">Settled USD</div>
+      <div class="stat-value">${{ "%.4f"|format(overview.total_usd) }}</div>
+    </div>
+    <div class="stat-tile" style="--tile-color:var(--accent)">
+      <div class="stat-label">Settled payments</div>
+      <div class="stat-value">{{ overview.settled_payments }}</div>
+    </div>
+    <div class="stat-tile" style="--tile-color:var(--red)">
+      <div class="stat-label">Failed attempts</div>
+      <div class="stat-value">{{ overview.failed_payments }}</div>
+    </div>
+    <div class="stat-tile" style="--tile-color:var(--orange)">
+      <div class="stat-label">Unpriced settlements</div>
+      <div class="stat-value">{{ overview.unpriced_settlements }}</div>
+    </div>
+  </div>
+
+  <section class="card economics-section">
+    <div class="section-head">
+      <div>
+        <h2>Spend by project</h2>
+        <p>Successful settlements recorded in stored eval traces.</p>
+      </div>
+    </div>
+    {% if overview.projects %}
+    <div class="table-wrapper">
+      <table>
+        <thead><tr><th>Project</th><th>Settled USD</th><th>Settled</th><th>Failed</th><th>Unpriced</th></tr></thead>
+        <tbody>
+          {% for project in overview.projects %}
+          <tr>
+            <td><a class="project-link" href="/projects/{{ project.slug }}">{{ project.name }}</a></td>
+            <td class="mono economics-money">${{ "%.4f"|format(project.total_usd) }}</td>
+            <td>{{ project.settled_payments }}</td>
+            <td>{{ project.failed_payments }}</td>
+            <td>{{ project.unpriced_settlements }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="empty-state economics-empty">
+      <h3>No payment events yet</h3>
+      <p>Payment activity will appear after an evaluated run reports a payment event.</p>
+    </div>
+    {% endif %}
+  </section>
+
+  {% if overview.recent_payments %}
+  <section class="card economics-section">
+    <div class="section-head">
+      <div>
+        <h2>Recent payments</h2>
+        <p>The latest 50 payment attempts across projects.</p>
+      </div>
+    </div>
+    <div class="table-wrapper">
+      <table class="payments-table">
+        <thead><tr><th>Status</th><th>Project / run</th><th>USD</th><th>Native</th><th>Network</th><th>Recipient</th><th>Transaction</th></tr></thead>
+        <tbody>
+          {% for payment in overview.recent_payments %}
+          <tr>
+            <td><span class="status-badge {{ 'passed' if payment.success else 'failed' }}">{{ 'settled' if payment.success else 'failed' }}</span></td>
+            <td>
+              <a class="project-link" href="/projects/{{ payment.project_slug }}/runs/{{ payment.run_id }}">{{ payment.project_name }}</a>
+              <div class="payment-meta">{{ payment.run_label or payment.run_id }}</div>
+              <div class="payment-meta">{{ payment.created_at.strftime('%Y-%m-%d %H:%M') }}</div>
+            </td>
+            <td class="mono economics-money">{% if payment.amount_usd is not none %}${{ "%.4f"|format(payment.amount_usd) }}{% else %}—{% endif %}</td>
+            <td class="mono">{{ payment.amount or '—' }}{% if payment.asset %} {{ payment.asset }}{% endif %}</td>
+            <td><span class="protocol-badge subtle">{{ payment.protocol }}</span><div class="payment-meta mono">{{ payment.network or '—' }}</div></td>
+            <td class="mono payment-address" title="{{ payment.recipient or '' }}">{{ payment.recipient or '—' }}</td>
+            <td class="mono payment-address" title="{{ payment.transaction or '' }}">{{ payment.transaction or '—' }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+  {% endif %}
+</div>
+{% endblock %}

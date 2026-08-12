@@ -18,6 +18,9 @@ EXPECTED_NAMES = [
     "LatencyUnder",
     "CostUnder",
     "ToolCalled",
+    "PaymentCostUnder",
+    "PaymentCountAtMost",
+    "PaymentRecipientsAllowed",
     "LLMJudge",
     "EmbeddingSimilarity",
     "ForbiddenToolCalled",
@@ -32,6 +35,7 @@ EXPECTED_NAMES = [
     "track",
     "tool",
     "approval",
+    "record_payment",
     "span",
     "current_trace",
     # eval

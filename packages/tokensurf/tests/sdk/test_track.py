@@ -1,7 +1,7 @@
 import pytest
 
 from tokensurf.core.models import Trace
-from tokensurf.sdk.track import approval, current_trace, span, tool, track
+from tokensurf.sdk.track import approval, current_trace, record_payment, span, tool, track
 
 
 class ListSink:
@@ -217,3 +217,54 @@ def test_approval_decorator_records_denial():
     recorded = sink.traces[0].spans[0]
     assert recorded.name == "confirm-delete"
     assert recorded.attributes["approval_granted"] is False
+
+
+def test_record_payment_captures_x402_settlement_and_generic_cost():
+    sink = ListSink()
+
+    @track(sink=sink)
+    def agent():
+        return record_payment(
+            amount_usd=0.025,
+            amount="25000",
+            asset="USDC",
+            network="eip155:8453",
+            recipient="0xmerchant",
+            payer="0xagent",
+            transaction="0xtx",
+        )
+
+    recorded = agent()
+    assert recorded.name == "payment.x402"
+    assert recorded.type == "custom"
+    assert recorded.attributes["payment.recorded"] is True
+    assert recorded.attributes["payment.amount"] == "25000"
+    assert recorded.attributes["payment.amount_usd"] == pytest.approx(0.025)
+    assert recorded.attributes["payment.success"] is True
+    assert recorded.attributes["cost"] == pytest.approx(0.025)
+    assert recorded.output["network"] == "eip155:8453"
+    assert sink.traces[0].spans == [recorded]
+
+
+def test_failed_payment_attempt_is_visible_but_not_counted_as_cost():
+    sink = ListSink()
+
+    @track(sink=sink)
+    def agent():
+        return record_payment(amount_usd=1.0, recipient="merchant", success=False)
+
+    recorded = agent()
+    assert recorded.attributes["payment.success"] is False
+    assert "cost" not in recorded.attributes
+
+
+@pytest.mark.parametrize("amount", [-1, float("inf"), float("nan"), True, "not-a-number"])
+def test_record_payment_rejects_invalid_usd_amount(amount):
+    with pytest.raises(ValueError, match="amount_usd"):
+        record_payment(amount_usd=amount)
+
+
+def test_record_payment_outside_trace_is_safe():
+    recorded = record_payment(amount="1", asset="USDC")
+    assert recorded.end is not None
+    assert current_trace() is None

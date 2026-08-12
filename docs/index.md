@@ -34,7 +34,7 @@ print(f"pass rate: {report.pass_rate():.0%}")
 
 ## What is in the box
 
-- **Scoring engine** — 17 scorers in five families (see the table below). Every score is
+- **Scoring engine** — 20 scorers in six families (see the table below). Every score is
   normalized to 0.0–1.0, and scorer failures never abort a run: they surface as errored results.
 - **Capture SDK** — the `@track`, `@tool`, and `@approval` decorators, the `span()` context
   manager, and local sinks (SQLite,
@@ -58,12 +58,13 @@ print(f"pass rate: {report.pass_rate():.0%}")
 - Anyone grading more than the final answer: trajectory scorers check tool ordering, loops, step
   budgets, and recovery across the whole multi-step run.
 
-## The five scorer families
+## The six scorer families
 
 | Family | Scorers | Model call |
 |--------|---------|------------|
 | Deterministic | `ExactMatch`, `Contains`, `Regex`, `JSONSchemaValid`, `LatencyUnder`, `CostUnder`, `ToolCalled` | None — code-based assertions, reproducible and free |
 | Security | `ForbiddenToolCalled`, `NoCanaryLeak`, `ApprovalRequired` | None — deterministic checks over tool calls and outputs |
+| Economics | `PaymentCostUnder`, `PaymentCountAtMost`, `PaymentRecipientsAllowed` | None — deterministic payment budgets and allowlists |
 | LLM judge | `LLMJudge` | Yes — grades against your criteria on a 1–10 rubric, provider-agnostic via litellm |
 | Reference-based | `EmbeddingSimilarity` | Embeddings — cosine similarity between output and `case.expected` |
 | Agent trajectory | `ToolSequence`, `NoLoops`, `StepBudget`, `TaskCompletion`, `Recovery` | Only `TaskCompletion` (delegates to an `LLMJudge`) |
@@ -111,7 +112,8 @@ Python 3.11 or newer is required. Licensed under Apache-2.0.
 
 - [Quickstart](quickstart.md) — install from source and run your first eval end to end.
 - [Capture SDK](sdk.md) — decorators, `span()`, traces, spans, and local sinks.
-- [Scorers](scorers.md) — the full reference for all 17 scorers and their arguments.
+- [Scorers](scorers.md) — the full reference for all 20 scorers and their arguments.
+- [Economics and x402](economics.md) — record agent payments, enforce budgets, and track spend.
 - [Agent security testing](security-testing.md) — instrument tools and approvals, then catch
   forbidden actions, canary leaks, and missing authorization in CI.
 - [CLI](cli.md) — `tokensurf eval run` and `tokensurf eval report`, flags and env vars.

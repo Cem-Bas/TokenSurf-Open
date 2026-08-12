@@ -27,12 +27,15 @@
         <a href="/scorers" class="nav-item{% if path == '/scorers' %} active{% endif %}">
           <span class="nav-icon">◆</span> Scorers
         </a>
+        <a href="/economics" class="nav-item{% if path == '/economics' %} active{% endif %}">
+          <span class="nav-icon">$</span> Economics
+        </a>
         <div class="nav-section">Configuration</div>
         <a href="/settings" class="nav-item{% if path == '/settings' or path.startswith('/settings/') %} active{% endif %}">
           <span class="nav-icon">⚙</span> Settings
         </a>
-        <a href="/docs" class="nav-item{% if path == '/docs' %} active{% endif %}">
-          <span class="nav-icon">❯</span> Docs
+        <a href="https://tokensurf.io/docs" class="nav-item" target="_blank" rel="noopener noreferrer">
+          <span class="nav-icon">❯</span> Docs <span class="nav-external" aria-hidden="true">↗</span>
         </a>
       </nav>
       <div class="sidebar-footer">

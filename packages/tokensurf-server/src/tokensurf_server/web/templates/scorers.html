@@ -2,71 +2,105 @@
 {% block title %}Scorers — TokenSurf{% endblock %}
 
 {% block content %}
-<div class="page">
+<div class="page scorer-dashboard">
   <div class="page-header">
     <h1 class="page-title">Scorers</h1>
-    <p class="page-sub">The four scorer families that grade every agent run. Each score is normalized to 0–1.</p>
+    <p class="page-sub">Performance across stored evaluation runs.</p>
   </div>
 
-  <div class="feature-grid">
-    <div class="feature-card">
-      <div class="feature-head">
-        <span class="scorer-pill">LLM-judge</span>
-        <span class="badge status-badge passed">flexible</span>
-      </div>
-      <p class="feature-desc">An LLM grades the response against criteria — accuracy, completeness, relevance, helpfulness — on a 1–10 rubric, normalized to 0–1. Provider-agnostic via litellm; bring your own judge model.</p>
-      <div class="feature-tags">
-        <span class="scorer-pill">LLMJudge</span>
-      </div>
+  <div class="stats-grid scorer-dashboard-stats">
+    <div class="stat-tile" style="--tile-color:var(--accent)">
+      <div class="stat-label">Scorers observed</div>
+      <div class="stat-value">{{ overview.unique_scorers }}</div>
     </div>
-
-    <div class="feature-card">
-      <div class="feature-head">
-        <span class="scorer-pill">Deterministic</span>
-        <span class="badge status-badge passed">fast · cheap</span>
-      </div>
-      <p class="feature-desc">Code-based assertions with no model call — exact/fuzzy matches, schema validity, tool-call and latency/cost checks. Reproducible and free.</p>
-      <div class="feature-tags">
-        <span class="scorer-pill">ExactMatch</span>
-        <span class="scorer-pill">Contains</span>
-        <span class="scorer-pill">Regex</span>
-        <span class="scorer-pill">JSONSchemaValid</span>
-        <span class="scorer-pill">LatencyUnder</span>
-        <span class="scorer-pill">CostUnder</span>
-        <span class="scorer-pill">ToolCalled</span>
-      </div>
+    <div class="stat-tile" style="--tile-color:var(--dark)">
+      <div class="stat-label">Total results</div>
+      <div class="stat-value">{{ overview.total_scores }}</div>
     </div>
-
-    <div class="feature-card">
-      <div class="feature-head">
-        <span class="scorer-pill">Reference-based</span>
-        <span class="badge status-badge running">optional</span>
-      </div>
-      <p class="feature-desc">Compare the output against an expected answer using embedding similarity. Objective when you have labeled data.</p>
-      <div class="feature-tags">
-        <span class="scorer-pill">EmbeddingSimilarity</span>
-      </div>
+    <div class="stat-tile" style="--tile-color:var(--green)">
+      <div class="stat-label">Overall pass rate</div>
+      <div class="stat-value">{% if overview.pass_rate is not none %}{{ "%.1f"|format(overview.pass_rate * 100) }}%{% else %}—{% endif %}</div>
     </div>
-
-    <div class="feature-card">
-      <div class="feature-head">
-        <span class="scorer-pill">Agent-trajectory</span>
-        <span class="badge status-badge passed">differentiator</span>
-      </div>
-      <p class="feature-desc">Grade the whole multi-step run, not just the final answer — tool ordering, loops, step budget, task completion, and recovery from errors.</p>
-      <div class="feature-tags">
-        <span class="scorer-pill">ToolSequence</span>
-        <span class="scorer-pill">NoLoops</span>
-        <span class="scorer-pill">StepBudget</span>
-        <span class="scorer-pill">TaskCompletion</span>
-        <span class="scorer-pill">Recovery</span>
-      </div>
+    <div class="stat-tile" style="--tile-color:var(--red)">
+      <div class="stat-label">Failed / errored</div>
+      <div class="stat-value">{{ overview.failed_scores }}<span class="stat-divider">/</span>{{ overview.errored_scores }}</div>
     </div>
   </div>
 
-  <div class="card" id="docs" style="margin-top:1.4rem;padding:1.4rem 1.6rem">
-    <h2 style="font-size:1rem;margin-bottom:0.5rem">Using scorers</h2>
-    <p class="page-sub" style="margin:0">Decorate your agent with <span class="mono">@ts.track</span>, define scorers, and run <span class="mono">tokensurf eval</span> in CI. Runs push to this dashboard automatically.</p>
-  </div>
+  <section class="card scorer-dashboard-section">
+    <div class="section-head">
+      <div>
+        <h2>Scorer health</h2>
+        <p>Worst pass rates appear first.</p>
+      </div>
+    </div>
+    {% if overview.scorers %}
+    <div class="table-wrapper">
+      <table>
+        <thead><tr><th>Scorer</th><th>Pass rate</th><th>Mean score</th><th>Results</th><th>Failed</th><th>Errors</th><th>Last seen</th></tr></thead>
+        <tbody>
+          {% for scorer in overview.scorers %}
+          <tr>
+            <td>
+              <span class="scorer-name">{{ scorer.name }}</span>
+              <div class="payment-meta">{{ scorer.family }}</div>
+            </td>
+            <td>
+              {% if scorer.pass_rate is not none %}
+              <div class="health-cell">
+                <div class="health-meter"><span class="{% if scorer.pass_rate >= 0.8 %}healthy{% elif scorer.pass_rate >= 0.5 %}warning{% else %}critical{% endif %}" style="width:{{ scorer.pass_rate * 100 }}%"></span></div>
+                <span class="mono">{{ "%.1f"|format(scorer.pass_rate * 100) }}%</span>
+              </div>
+              {% else %}<span class="mono">—</span>{% endif %}
+            </td>
+            <td class="mono">{% if scorer.mean_score is not none %}{{ "%.3f"|format(scorer.mean_score) }}{% else %}—{% endif %}</td>
+            <td>{{ scorer.total_scores }}</td>
+            <td class="{{ 'red' if scorer.failed_scores else '' }}">{{ scorer.failed_scores }}</td>
+            <td class="{{ 'orange' if scorer.errored_scores else '' }}">{{ scorer.errored_scores }}</td>
+            <td class="table-date">{{ scorer.last_seen_at.strftime('%Y-%m-%d %H:%M') }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="empty-state dashboard-empty">
+      <h3>No scorer results yet</h3>
+      <p>Scorer performance will appear after the first evaluation run is pushed.</p>
+    </div>
+    {% endif %}
+  </section>
+
+  {% if overview.recent_problems %}
+  <section class="card scorer-dashboard-section">
+    <div class="section-head">
+      <div>
+        <h2>Recent problems</h2>
+        <p>Latest failing and errored scorer results across projects.</p>
+      </div>
+    </div>
+    <div class="table-wrapper">
+      <table>
+        <thead><tr><th>Outcome</th><th>Scorer</th><th>Project / run</th><th>Case</th><th>Score</th><th>Details</th><th>Recorded</th></tr></thead>
+        <tbody>
+          {% for problem in overview.recent_problems %}
+          <tr>
+            <td><span class="status-badge {{ 'errored' if problem.error else 'failed' }}">{{ 'errored' if problem.error else 'failed' }}</span></td>
+            <td><span class="scorer-name">{{ problem.scorer }}</span></td>
+            <td>
+              <a class="project-link" href="/projects/{{ problem.project_slug }}/runs/{{ problem.run_id }}">{{ problem.project_name }}</a>
+              <div class="payment-meta">{{ problem.run_label or problem.run_id }}</div>
+            </td>
+            <td class="mono table-truncate" title="{{ problem.case_id }}">{{ problem.case_id }}</td>
+            <td class="mono">{% if problem.value is not none %}{{ "%.3f"|format(problem.value) }}{% else %}—{% endif %}</td>
+            <td class="problem-detail" title="{{ problem.error or '' }}">{{ problem.error or 'Threshold not met' }}</td>
+            <td class="table-date">{{ problem.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+  {% endif %}
 </div>
 {% endblock %}

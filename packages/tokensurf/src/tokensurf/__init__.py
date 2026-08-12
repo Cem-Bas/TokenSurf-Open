@@ -26,6 +26,13 @@ from tokensurf.scorers.deterministic import (
     ToolCalled,
 )
 
+# Scorers — economics
+from tokensurf.scorers.economics import (
+    PaymentCostUnder,
+    PaymentCountAtMost,
+    PaymentRecipientsAllowed,
+)
+
 # Scorers — LLM
 from tokensurf.scorers.llm import LLMJudge
 
@@ -46,7 +53,7 @@ from tokensurf.scorers.trajectory import (
 )
 
 # SDK tracking helpers
-from tokensurf.sdk.track import approval, current_trace, span, tool, track
+from tokensurf.sdk.track import approval, current_trace, record_payment, span, tool, track
 
 __all__ = [
     "__version__",
@@ -65,6 +72,9 @@ __all__ = [
     "LatencyUnder",
     "CostUnder",
     "ToolCalled",
+    "PaymentCostUnder",
+    "PaymentCountAtMost",
+    "PaymentRecipientsAllowed",
     "LLMJudge",
     "EmbeddingSimilarity",
     "ForbiddenToolCalled",
@@ -79,6 +89,7 @@ __all__ = [
     "track",
     "tool",
     "approval",
+    "record_payment",
     "span",
     "current_trace",
     # eval

@@ -10,6 +10,7 @@ from __future__ import annotations
 from collections import defaultdict
 from dataclasses import dataclass, field
 from datetime import datetime
+from math import isfinite
 
 from sqlalchemy import case, func, select
 from sqlalchemy.orm import Session
@@ -140,6 +141,79 @@ class RunDetail:
     gate_results: list[GateResultView] = field(default_factory=list)
 
 
+@dataclass
+class PaymentView:
+    project_slug: str
+    project_name: str
+    run_id: str
+    run_label: str | None
+    created_at: datetime
+    protocol: str
+    amount_usd: float | None
+    amount: str | None
+    asset: str | None
+    network: str | None
+    recipient: str | None
+    success: bool
+    transaction: str | None
+
+
+@dataclass
+class EconomicsProjectSummary:
+    slug: str
+    name: str
+    total_usd: float
+    settled_payments: int
+    failed_payments: int
+    unpriced_settlements: int
+
+
+@dataclass
+class EconomicsOverview:
+    total_usd: float
+    settled_payments: int
+    failed_payments: int
+    unpriced_settlements: int
+    projects: list[EconomicsProjectSummary]
+    recent_payments: list[PaymentView]
+
+
+@dataclass
+class ScorerSummary:
+    name: str
+    family: str
+    total_scores: int
+    pass_rate: float | None
+    mean_score: float | None
+    failed_scores: int
+    errored_scores: int
+    last_seen_at: datetime
+
+
+@dataclass
+class ScorerProblemView:
+    scorer: str
+    value: float | None
+    error: str | None
+    project_slug: str
+    project_name: str
+    run_id: str
+    run_label: str | None
+    case_id: str
+    created_at: datetime
+
+
+@dataclass
+class ScorersOverview:
+    total_scores: int
+    unique_scorers: int
+    pass_rate: float | None
+    failed_scores: int
+    errored_scores: int
+    scorers: list[ScorerSummary]
+    recent_problems: list[ScorerProblemView]
+
+
 # ── helpers ───────────────────────────────────────────────────────────────────
 
 
@@ -168,6 +242,46 @@ def _distribution(values: list[float]) -> list[int]:
         else:
             dist[3] += 1
     return dist
+
+
+def _optional_text(value: object) -> str | None:
+    if value is None:
+        return None
+    return str(value)
+
+
+def _payment_usd(value: object) -> float | None:
+    if isinstance(value, bool) or not isinstance(value, (str, int, float)):
+        return None
+    try:
+        amount = float(value)
+    except (TypeError, ValueError):
+        return None
+    return amount if amount >= 0 and isfinite(amount) else None
+
+
+_SCORER_FAMILIES = {
+    "ExactMatch": "Deterministic",
+    "Contains": "Deterministic",
+    "Regex": "Deterministic",
+    "JSONSchemaValid": "Deterministic",
+    "LatencyUnder": "Deterministic",
+    "CostUnder": "Deterministic",
+    "ToolCalled": "Deterministic",
+    "ForbiddenToolCalled": "Security",
+    "NoCanaryLeak": "Security",
+    "ApprovalRequired": "Security",
+    "PaymentCostUnder": "Economics",
+    "PaymentCountAtMost": "Economics",
+    "PaymentRecipientsAllowed": "Economics",
+    "LLMJudge": "LLM judge",
+    "EmbeddingSimilarity": "Reference",
+    "ToolSequence": "Trajectory",
+    "NoLoops": "Trajectory",
+    "StepBudget": "Trajectory",
+    "TaskCompletion": "Trajectory",
+    "Recovery": "Trajectory",
+}
 
 
 # ── public API ────────────────────────────────────────────────────────────────
@@ -204,6 +318,151 @@ def list_projects_with_summary(session: Session) -> list[ProjectSummary]:
             )
         )
     return result
+
+
+def economics_overview(session: Session, *, recent_limit: int = 50) -> EconomicsOverview:
+    """Aggregate recorded payment spans across projects without a separate ledger table."""
+    rows = session.execute(
+        select(CaseResult, Run, Project)
+        .join(Run, CaseResult.run_id == Run.id)
+        .join(Project, Run.project_id == Project.id)
+        .order_by(Run.created_at.desc())
+    ).all()
+
+    payments: list[PaymentView] = []
+    project_totals: dict[str, EconomicsProjectSummary] = {}
+    for case_result, run, project in rows:
+        trace = case_result.trace if isinstance(case_result.trace, dict) else {}
+        spans = trace.get("spans", [])
+        if not isinstance(spans, list):
+            continue
+        for span in spans:
+            if not isinstance(span, dict):
+                continue
+            attributes = span.get("attributes", {})
+            if not isinstance(attributes, dict) or attributes.get("payment.recorded") is not True:
+                continue
+
+            success = attributes.get("payment.success") is True
+            amount_usd = _payment_usd(attributes.get("payment.amount_usd"))
+            payment = PaymentView(
+                project_slug=project.slug,
+                project_name=project.name,
+                run_id=run.id,
+                run_label=run.label,
+                created_at=run.created_at,
+                protocol=_optional_text(attributes.get("payment.protocol")) or "payment",
+                amount_usd=amount_usd,
+                amount=_optional_text(attributes.get("payment.amount")),
+                asset=_optional_text(attributes.get("payment.asset")),
+                network=_optional_text(attributes.get("payment.network")),
+                recipient=_optional_text(attributes.get("payment.recipient")),
+                success=success,
+                transaction=_optional_text(attributes.get("payment.transaction")),
+            )
+            payments.append(payment)
+
+            summary = project_totals.setdefault(
+                project.id,
+                EconomicsProjectSummary(
+                    slug=project.slug,
+                    name=project.name,
+                    total_usd=0.0,
+                    settled_payments=0,
+                    failed_payments=0,
+                    unpriced_settlements=0,
+                ),
+            )
+            if success:
+                summary.settled_payments += 1
+                if amount_usd is None:
+                    summary.unpriced_settlements += 1
+                else:
+                    summary.total_usd += amount_usd
+            else:
+                summary.failed_payments += 1
+
+    projects = sorted(project_totals.values(), key=lambda item: (-item.total_usd, item.name))
+    return EconomicsOverview(
+        total_usd=sum(project.total_usd for project in projects),
+        settled_payments=sum(project.settled_payments for project in projects),
+        failed_payments=sum(project.failed_payments for project in projects),
+        unpriced_settlements=sum(project.unpriced_settlements for project in projects),
+        projects=projects,
+        recent_payments=payments[: max(0, recent_limit)],
+    )
+
+
+def scorers_overview(session: Session, *, recent_limit: int = 50) -> ScorersOverview:
+    """Aggregate scorer health and recent problems across stored eval runs."""
+    rows = session.execute(
+        select(Score, Run, Project, CaseResult)
+        .join(Run, Score.run_id == Run.id)
+        .join(Project, Run.project_id == Project.id)
+        .join(CaseResult, Score.case_result_id == CaseResult.id)
+        .order_by(Run.created_at.desc())
+    ).all()
+
+    buckets: dict[str, list[tuple[Score, datetime]]] = defaultdict(list)
+    problems: list[ScorerProblemView] = []
+    for score, run, project, case_result in rows:
+        buckets[score.scorer].append((score, run.created_at))
+        if score.passed is False or score.error is not None:
+            problems.append(
+                ScorerProblemView(
+                    scorer=score.scorer,
+                    value=score.value,
+                    error=score.error,
+                    project_slug=project.slug,
+                    project_name=project.name,
+                    run_id=run.id,
+                    run_label=run.label,
+                    case_id=case_result.case_id,
+                    created_at=run.created_at,
+                )
+            )
+
+    summaries: list[ScorerSummary] = []
+    for name, scores_and_dates in buckets.items():
+        scores = [item[0] for item in scores_and_dates]
+        scored = [score for score in scores if score.error is None]
+        passed = sum(score.passed is True for score in scored)
+        values = [score.value for score in scores if score.value is not None]
+        summaries.append(
+            ScorerSummary(
+                name=name,
+                family=_SCORER_FAMILIES.get(name, "Custom"),
+                total_scores=len(scores),
+                pass_rate=passed / len(scored) if scored else None,
+                mean_score=sum(values) / len(values) if values else None,
+                failed_scores=sum(score.passed is False for score in scores),
+                errored_scores=sum(score.error is not None for score in scores),
+                last_seen_at=max(item[1] for item in scores_and_dates),
+            )
+        )
+
+    summaries.sort(
+        key=lambda item: (
+            item.pass_rate if item.pass_rate is not None else -1.0,
+            -item.errored_scores,
+            item.name,
+        )
+    )
+    all_scores = [item[0] for scores_and_dates in buckets.values() for item in scores_and_dates]
+    non_errored = [score for score in all_scores if score.error is None]
+    return ScorersOverview(
+        total_scores=len(all_scores),
+        unique_scorers=len(buckets),
+        pass_rate=(
+            sum(score.passed is True for score in non_errored) / len(non_errored)
+            if non_errored
+            else None
+        ),
+        failed_scores=sum(score.passed is False for score in all_scores),
+        errored_scores=sum(score.error is not None for score in all_scores),
+        scorers=summaries,
+        recent_problems=problems[: max(0, recent_limit)],
+    )
 
 
 def project_overview(session: Session, slug: str) -> ProjectOverview | None:
