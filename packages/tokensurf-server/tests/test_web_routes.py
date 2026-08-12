@@ -116,7 +116,7 @@ def seeded(db_session: Session) -> dict:
                         "payment.transaction": "0xtransaction",
                         "cost": 0.025,
                     },
-                }
+                },
             ]
         },
     )
@@ -209,7 +209,7 @@ def test_scorers_page_shows_performance_dashboard(client, seeded) -> None:
     assert "relevance" in resp.text
     assert "50.0%" in resp.text
     assert "Recent problems" in resp.text
-    assert f'/projects/test-proj/runs/{seeded["run"].id}' in resp.text
+    assert f"/projects/test-proj/runs/{seeded['run'].id}" in resp.text
     assert "LLM-judge" not in resp.text
 
 
@@ -220,7 +220,7 @@ def test_economics_page_shows_payment_dashboard(client, seeded) -> None:
     assert "Economics" in resp.text
     assert "$0.0250" in resp.text
     assert "0xmerchant" in resp.text
-    assert f'/projects/test-proj/runs/{seeded["run"].id}' in resp.text
+    assert f"/projects/test-proj/runs/{seeded['run'].id}" in resp.text
     assert "Record a payment" not in resp.text
 
 
