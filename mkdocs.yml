@@ -44,9 +44,12 @@ nav:
   - Guides:
       - SDK reference: sdk.md
       - Scorers: scorers.md
+      - Economics & x402: economics.md
       - CLI reference: cli.md
+  - Security:
+      - Agent security testing: security-testing.md
+      - Server security model: security.md
   - Server:
       - Self-hosting: self-hosting.md
       - Quality gates & notifications: quality-gates.md
       - Judge keys & config pull: config-pull.md
-  - Security model: security.md

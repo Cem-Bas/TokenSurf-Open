@@ -37,6 +37,7 @@ a:hover { text-decoration: underline; }
 .accent { color: var(--accent); }
 .green { color: var(--green); }
 .orange { color: var(--orange); }
+.red { color: var(--red); }
 
 /* ---- top bar ---- */
 .topbar { display: flex; align-items: center; justify-content: space-between; padding: 0.85rem 2rem; background: var(--dark); color: #fff; }
@@ -166,6 +167,7 @@ a:hover { text-decoration: underline; }
 .nav-item.active { background: var(--accent); color: #fff; }
 .nav-item.active:hover { background: var(--accent); }
 .nav-icon { width: 1.1rem; text-align: center; font-size: 0.85rem; opacity: 0.85; }
+.nav-external { margin-left: auto; color: rgba(255, 255, 255, 0.45); font-size: 0.72rem; }
 .sidebar .badge-soon { margin-left: auto; }
 .sidebar-footer { border-top: 1px solid rgba(255, 255, 255, 0.1); padding: 1rem 1.2rem; }
 .sidebar-user { font-size: 0.8rem; color: rgba(255, 255, 255, 0.7); margin-bottom: 0.6rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -186,6 +188,38 @@ a:hover { text-decoration: underline; }
 .feature-desc { color: var(--light-text); font-size: 0.88rem; margin: 0 0 0.9rem; }
 .feature-tags { display: flex; flex-wrap: wrap; gap: 0.4rem; }
 
+/* ---- economics / agent payments ---- */
+.economics-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; }
+.protocol-badge { display: inline-flex; align-items: center; white-space: nowrap; border-radius: 100px; background: var(--green-bg); color: var(--green); border: 1px solid rgba(16, 163, 127, 0.2); padding: 0.25rem 0.7rem; font-family: var(--font-mono); font-size: 0.72rem; font-weight: 700; }
+.protocol-badge.subtle { background: var(--accent-soft); color: var(--accent); border-color: rgba(79, 109, 245, 0.18); padding: 0.12rem 0.5rem; }
+.economics-stats { grid-template-columns: repeat(4, 1fr); }
+.section-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; padding: 1.2rem 1.35rem; }
+.section-head h2 { font-size: 1rem; }
+.section-head p { color: var(--light-text); font-size: 0.82rem; margin: 0.2rem 0 0; }
+.economics-section { margin-top: 1.2rem; }
+.economics-section.card + .economics-section.card { margin-top: 1.2rem; }
+.economics-money { color: var(--green); font-weight: 700; }
+.project-link { color: var(--dark); font-weight: 700; }
+.payment-meta { color: var(--light-text); font-size: 0.7rem; margin-top: 0.15rem; max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.payment-address { display: block; max-width: 145px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.economics-empty { padding: 2.3rem 1rem; border-top: 1px solid var(--border); }
+
+/* ---- scorer performance dashboard ---- */
+.scorer-dashboard-stats { grid-template-columns: repeat(4, 1fr); }
+.stat-divider { color: var(--light-text); font-size: 1rem; margin: 0 0.22rem; }
+.scorer-dashboard-section { margin-top: 1.2rem; }
+.scorer-name { font-family: var(--font-mono); font-size: 0.8rem; font-weight: 700; color: var(--dark); }
+.health-cell { display: flex; align-items: center; gap: 0.6rem; min-width: 155px; }
+.health-meter { width: 88px; height: 7px; overflow: hidden; border-radius: 100px; background: var(--cream); }
+.health-meter span { display: block; height: 100%; border-radius: inherit; }
+.health-meter .healthy { background: var(--green); }
+.health-meter .warning { background: var(--orange); }
+.health-meter .critical { background: var(--red); }
+.table-date { color: var(--light-text); font-size: 0.78rem; white-space: nowrap; }
+.table-truncate { max-width: 130px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.problem-detail { color: var(--light-text); max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dashboard-empty { padding: 2.3rem 1rem; border-top: 1px solid var(--border); }
+
 @media (max-width: 768px) {
   .stats-grid { grid-template-columns: 1fr; }
   .page { padding: 1.4rem 1rem 3rem; }
@@ -195,6 +229,8 @@ a:hover { text-decoration: underline; }
   .sidebar-nav { display: flex; gap: 0.3rem; flex: 1 1 100%; order: 3; }
   .nav-section { display: none; }
   .sidebar-footer { border-top: none; }
+  .economics-stats { grid-template-columns: 1fr; }
+  .scorer-dashboard-stats { grid-template-columns: 1fr; }
 }
 
 /* ---- filter bar + pagination (Runs view) ---- */

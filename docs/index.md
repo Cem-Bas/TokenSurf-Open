@@ -34,9 +34,10 @@ print(f"pass rate: {report.pass_rate():.0%}")
 
 ## What is in the box
 
-- **Scoring engine** — 14 scorers in four families (see the table below). Every score is
+- **Scoring engine** — 20 scorers in six families (see the table below). Every score is
   normalized to 0.0–1.0, and scorer failures never abort a run: they surface as errored results.
-- **Capture SDK** — the `@track` decorator, the `span()` context manager, and local sinks (SQLite,
+- **Capture SDK** — the `@track`, `@tool`, and `@approval` decorators, the `span()` context
+  manager, and local sinks (SQLite,
   JSONL). Framework-agnostic: it wraps your functions and never proxies your model traffic, and
   sink writes are best-effort, so capture can never break your agent.
 - **Offline eval harness** — `Dataset` (from lists, JSONL, or CSV), `evaluate()`, `EvalReport`
@@ -57,11 +58,13 @@ print(f"pass rate: {report.pass_rate():.0%}")
 - Anyone grading more than the final answer: trajectory scorers check tool ordering, loops, step
   budgets, and recovery across the whole multi-step run.
 
-## The four scorer families
+## The six scorer families
 
 | Family | Scorers | Model call |
 |--------|---------|------------|
 | Deterministic | `ExactMatch`, `Contains`, `Regex`, `JSONSchemaValid`, `LatencyUnder`, `CostUnder`, `ToolCalled` | None — code-based assertions, reproducible and free |
+| Security | `ForbiddenToolCalled`, `NoCanaryLeak`, `ApprovalRequired` | None — deterministic checks over tool calls and outputs |
+| Economics | `PaymentCostUnder`, `PaymentCountAtMost`, `PaymentRecipientsAllowed` | None — deterministic payment budgets and allowlists |
 | LLM judge | `LLMJudge` | Yes — grades against your criteria on a 1–10 rubric, provider-agnostic via litellm |
 | Reference-based | `EmbeddingSimilarity` | Embeddings — cosine similarity between output and `case.expected` |
 | Agent trajectory | `ToolSequence`, `NoLoops`, `StepBudget`, `TaskCompletion`, `Recovery` | Only `TaskCompletion` (delegates to an `LLMJudge`) |
@@ -76,7 +79,7 @@ scorer errors). The full reference, including constructor arguments for each sco
  your agent code           offline eval (local or CI)      self-hosted, optional
 +-----------------+ traces +-----------------------+  push  +------------------------+
 | capture SDK     |------->| eval harness          |------->| TokenSurf Server       |
-| @track / span() |        | evaluate() + scorers  | HTTPS  | dashboard: runs/trends |
+| decorators/spans|        | evaluate() + scorers  | HTTPS  | dashboard: runs/trends |
 +-----------------+        | tokensurf eval run    | + key  | quality gates          |
                            +-----------------------+        | Slack/webhook/email    |
                                      ^                      | encrypted judge keys   |
@@ -108,12 +111,16 @@ Python 3.11 or newer is required. Licensed under Apache-2.0.
 ## Where next
 
 - [Quickstart](quickstart.md) — install from source and run your first eval end to end.
-- [Capture SDK](sdk.md) — `@track`, `span()`, traces, spans, and local sinks.
-- [Scorers](scorers.md) — the full reference for all 14 scorers and their arguments.
+- [Capture SDK](sdk.md) — decorators, `span()`, traces, spans, and local sinks.
+- [Scorers](scorers.md) — the full reference for all 20 scorers and their arguments.
+- [Economics and x402](economics.md) — record agent payments, enforce budgets, and track spend.
+- [Agent security testing](security-testing.md) — instrument tools and approvals, then catch
+  forbidden actions, canary leaks, and missing authorization in CI.
 - [CLI](cli.md) — `tokensurf eval run` and `tokensurf eval report`, flags and env vars.
 - [Self-hosting](self-hosting.md) — run the collector server: Docker Compose, migrations,
   and the admin CLI.
 - [Quality gates and notifications](quality-gates.md) — gate runs on pass rate, mean score, or
   per-scorer pass rate; alert via Slack, webhook, or email.
 - [Config pull](config-pull.md) — store judge keys on the server and pull them at eval time.
-- [Security](security.md) — auth model, secret encryption at rest, and deployment hardening.
+- [Server security model](security.md) — auth, secret encryption at rest, and deployment
+  hardening.

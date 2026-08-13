@@ -10,9 +10,11 @@ from tokensurf.core.ids import new_id
 
 from tokensurf_server.models import CaseResult, Project, Run, Score
 from tokensurf_server.web.queries import (
+    economics_overview,
     list_projects_with_summary,
     project_overview,
     run_detail,
+    scorers_overview,
 )
 
 UTC = ZoneInfo("UTC")
@@ -66,6 +68,149 @@ def _score(
         passed=passed,
         error=error,
     )
+
+
+def _payment_span(
+    *,
+    usd: float | None = None,
+    amount: str = "100",
+    recipient: str = "merchant",
+    success: bool = True,
+) -> dict:
+    attributes = {
+        "payment.recorded": True,
+        "payment.protocol": "x402",
+        "payment.amount": amount,
+        "payment.asset": "USDC",
+        "payment.network": "eip155:8453",
+        "payment.recipient": recipient,
+        "payment.success": success,
+    }
+    if usd is not None:
+        attributes["payment.amount_usd"] = usd
+    return {"type": "custom", "name": "payment.x402", "attributes": attributes}
+
+
+# ── economics_overview ───────────────────────────────────────────────────────
+
+
+def test_economics_overview_aggregates_settled_failed_and_unpriced(db_session):
+    project = _project("qry-economics", "Economic Agent")
+    db_session.add(project)
+    run = _run(project.id, label="pay-v1")
+    db_session.add(run)
+    db_session.add(
+        CaseResult(
+            id=new_id(),
+            run_id=run.id,
+            case_id="payments",
+            trace={
+                "spans": [
+                    _payment_span(usd=0.25),
+                    _payment_span(success=False),
+                    _payment_span(amount="300"),
+                    {"name": "ordinary", "attributes": {"cost": 999}},
+                ]
+            },
+        )
+    )
+    db_session.flush()
+
+    overview = economics_overview(db_session)
+    project_summary = next(item for item in overview.projects if item.slug == "qry-economics")
+    assert project_summary.total_usd == pytest.approx(0.25)
+    assert project_summary.settled_payments == 2
+    assert project_summary.failed_payments == 1
+    assert project_summary.unpriced_settlements == 1
+    assert len([p for p in overview.recent_payments if p.project_slug == "qry-economics"]) == 3
+
+
+def test_economics_overview_applies_recent_limit_without_changing_totals(db_session):
+    project = _project("qry-economics-limit")
+    db_session.add(project)
+    run = _run(project.id)
+    db_session.add(run)
+    db_session.add(
+        CaseResult(
+            id=new_id(),
+            run_id=run.id,
+            case_id="payments",
+            trace={"spans": [_payment_span(usd=0.1), _payment_span(usd=0.2)]},
+        )
+    )
+    db_session.flush()
+
+    overview = economics_overview(db_session, recent_limit=1)
+    assert len(overview.recent_payments) == 1
+    assert overview.total_usd >= 0.3
+
+
+# ── scorers_overview ─────────────────────────────────────────────────────────
+
+
+def test_scorers_overview_aggregates_health_and_recent_problems(db_session):
+    project = _project("qry-scorers", "Scored Agent")
+    db_session.add(project)
+    run = _run(project.id, label="scored-v1")
+    db_session.add(run)
+    case_one = CaseResult(id=new_id(), run_id=run.id, case_id="case-pass")
+    case_two = CaseResult(id=new_id(), run_id=run.id, case_id="case-fail")
+    db_session.add_all([case_one, case_two])
+    db_session.add_all(
+        [
+            _score(run.id, case_one.id, scorer="ExactMatch", value=1.0, passed=True),
+            _score(run.id, case_two.id, scorer="ExactMatch", value=0.0, passed=False),
+            _score(
+                run.id,
+                case_two.id,
+                scorer="custom-policy",
+                value=None,
+                passed=None,
+                error="judge unavailable",
+            ),
+        ]
+    )
+    db_session.flush()
+
+    overview = scorers_overview(db_session)
+    exact = next(item for item in overview.scorers if item.name == "ExactMatch")
+    custom = next(item for item in overview.scorers if item.name == "custom-policy")
+    assert exact.family == "Deterministic"
+    assert exact.total_scores == 2
+    assert exact.pass_rate == pytest.approx(0.5)
+    assert exact.mean_score == pytest.approx(0.5)
+    assert exact.failed_scores == 1
+    assert custom.family == "Custom"
+    assert custom.pass_rate is None
+    assert custom.errored_scores == 1
+    assert overview.failed_scores >= 1
+    assert overview.errored_scores >= 1
+    assert {item.scorer for item in overview.recent_problems[:2]} == {
+        "ExactMatch",
+        "custom-policy",
+    }
+
+
+def test_scorers_overview_recent_limit_does_not_change_totals(db_session):
+    project = _project("qry-scorers-limit")
+    db_session.add(project)
+    run = _run(project.id)
+    db_session.add(run)
+    case_one = CaseResult(id=new_id(), run_id=run.id, case_id="one")
+    case_two = CaseResult(id=new_id(), run_id=run.id, case_id="two")
+    db_session.add_all([case_one, case_two])
+    db_session.add_all(
+        [
+            _score(run.id, case_one.id, scorer="policy", value=0.0, passed=False),
+            _score(run.id, case_two.id, scorer="policy", value=0.0, passed=False),
+        ]
+    )
+    db_session.flush()
+
+    overview = scorers_overview(db_session, recent_limit=1)
+    policy = next(item for item in overview.scorers if item.name == "policy")
+    assert len(overview.recent_problems) == 1
+    assert policy.total_scores == 2
 
 
 # ── list_projects_with_summary ────────────────────────────────────────────────

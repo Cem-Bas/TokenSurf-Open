@@ -26,12 +26,22 @@ from tokensurf.scorers.deterministic import (
     ToolCalled,
 )
 
+# Scorers — economics
+from tokensurf.scorers.economics import (
+    PaymentCostUnder,
+    PaymentCountAtMost,
+    PaymentRecipientsAllowed,
+)
+
 # Scorers — LLM
 from tokensurf.scorers.llm import LLMJudge
 
 # Scorers — reference (EmbeddingSimilarity uses litellm lazily; importable even
 # if the optional 'reference' extra is absent — only raises on actual score() call)
 from tokensurf.scorers.reference import EmbeddingSimilarity
+
+# Scorers — security
+from tokensurf.scorers.security import ApprovalRequired, ForbiddenToolCalled, NoCanaryLeak
 
 # Scorers — trajectory
 from tokensurf.scorers.trajectory import (
@@ -43,7 +53,7 @@ from tokensurf.scorers.trajectory import (
 )
 
 # SDK tracking helpers
-from tokensurf.sdk.track import current_trace, span, track
+from tokensurf.sdk.track import approval, current_trace, record_payment, span, tool, track
 
 __all__ = [
     "__version__",
@@ -62,8 +72,14 @@ __all__ = [
     "LatencyUnder",
     "CostUnder",
     "ToolCalled",
+    "PaymentCostUnder",
+    "PaymentCountAtMost",
+    "PaymentRecipientsAllowed",
     "LLMJudge",
     "EmbeddingSimilarity",
+    "ForbiddenToolCalled",
+    "NoCanaryLeak",
+    "ApprovalRequired",
     "ToolSequence",
     "NoLoops",
     "StepBudget",
@@ -71,6 +87,9 @@ __all__ = [
     "Recovery",
     # sdk
     "track",
+    "tool",
+    "approval",
+    "record_payment",
     "span",
     "current_trace",
     # eval

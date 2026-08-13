@@ -16,10 +16,17 @@ git clone <your-clone-url> tokensurf && cd tokensurf
 docker compose up
 ```
 
+If another local database already uses port `5432`, choose another host port without changing the
+container-to-container connection:
+
+```bash
+TOKENSURF_POSTGRES_PORT=54325 docker compose up
+```
+
 The stack provides:
 
-- `db` — `postgres:16` with a named volume (`postgres_data`), exposed on `localhost:5432`, with a
-  `pg_isready` healthcheck the app waits on.
+- `db` — `postgres:16` with a named volume (`postgres_data`), exposed on
+  `localhost:${TOKENSURF_POSTGRES_PORT:-5432}`, with a `pg_isready` healthcheck the app waits on.
 - `app` — built from `packages/tokensurf-server/Dockerfile`, exposed on `localhost:8000`. The
   container runs migrations (`tokensurf-server migrate`) and then starts
   `uvicorn tokensurf_server.app:app --host 0.0.0.0 --port 8000` on every start.

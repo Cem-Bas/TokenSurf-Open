@@ -34,6 +34,7 @@ from tokensurf_server.web.charts import distribution_bars, trend_svg
 from tokensurf_server.web.csrf import CSRF_COOKIE
 from tokensurf_server.web.csrf import verify as verify_csrf
 from tokensurf_server.web.queries import (
+    economics_overview,
     list_all_runs,
     list_channels,
     list_gates,
@@ -41,6 +42,7 @@ from tokensurf_server.web.queries import (
     list_secrets,
     project_overview,
     run_detail,
+    scorers_overview,
 )
 
 log = logging.getLogger(__name__)
@@ -291,16 +293,36 @@ def runs_list(
 def docs_page(
     request: Request,
     user: User = Depends(login_required),  # noqa: B008
-) -> HTMLResponse:
-    return templates.TemplateResponse(request, "docs.html", {"user": user})
+) -> Response:
+    return RedirectResponse("https://tokensurf.io/docs", status_code=302)
 
 
 @router.get("/scorers", response_class=HTMLResponse)
-def scorers_reference(
+def scorers_dashboard(
     request: Request,
     user: User = Depends(login_required),  # noqa: B008
+    session: Session = Depends(get_session),  # noqa: B008
 ) -> HTMLResponse:
-    return templates.TemplateResponse(request, "scorers.html", {"user": user})
+    overview = scorers_overview(session)
+    return templates.TemplateResponse(
+        request,
+        "scorers.html",
+        {"user": user, "overview": overview},
+    )
+
+
+@router.get("/economics", response_class=HTMLResponse)
+def economics_page(
+    request: Request,
+    user: User = Depends(login_required),  # noqa: B008
+    session: Session = Depends(get_session),  # noqa: B008
+) -> HTMLResponse:
+    overview = economics_overview(session)
+    return templates.TemplateResponse(
+        request,
+        "economics.html",
+        {"user": user, "overview": overview},
+    )
 
 
 @router.get("/projects/{slug}", response_class=HTMLResponse)

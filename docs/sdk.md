@@ -1,7 +1,9 @@
 # SDK reference
 
-The `tokensurf` package has two halves: a capture SDK (`@track`, `span()`, sinks) that records each
-agent run as a `Trace`, and an offline eval harness (`Dataset`, `evaluate()`, `assert_eval`) that
+The `tokensurf` package has two halves: a capture SDK (`@track`, `@tool`, `@approval`,
+`record_payment()`, `span()`,
+sinks) that records each agent run as a `Trace`, and an offline eval harness (`Dataset`,
+`evaluate()`, `assert_eval`) that
 runs a task over a dataset and grades every captured trace with scorers. This page documents both,
 plus the data models they share. For the scorer catalog see [Scorers](scorers.md); for the
 `tokensurf eval` commands see [CLI](cli.md).
@@ -41,7 +43,7 @@ The names below are importable directly from the top-level `tokensurf` namespace
 
 | Name | Kind |
 | --- | --- |
-| `track`, `span`, `current_trace` | capture SDK |
+| `track`, `tool`, `approval`, `record_payment`, `span`, `current_trace` | capture SDK |
 | `Dataset`, `evaluate` | eval harness |
 | `assert_eval` | pytest helper |
 | `Trace`, `Span`, `Case`, `ScoreResult`, `EvalReport` | data models |
@@ -126,6 +128,80 @@ On an exception inside the block, `sp.error = repr(exc)` is set and the exceptio
 Scorers that match on tool spans — `ToolCalled` (deterministic family) and trajectory scorers
 such as `ToolSequence` — match on span `type` and `name`, so give tool spans `type="tool"` and
 stable names.
+
+### `@tool`
+
+```python
+def tool(fn=None, *, name: str | None = None,
+         attributes: dict[str, Any] | None = None)
+```
+
+Wrap a tool function so calls inside an active trace automatically become `type="tool"` spans.
+The decorator records positional and keyword arguments as the span input, the return value as its
+output, and any exception through the normal `span()` error path. Outside an active trace it is
+transparent: the function still runs normally and the orphan span is discarded.
+
+```python
+@ts.tool(name="docs.search", attributes={"network": False})
+def search_docs(query: str, *, limit: int = 3):
+    return search(query, limit=limit)
+```
+
+Tool inputs and outputs become part of the trace. Do not pass real production secrets merely to
+test leak detection; use synthetic canary values.
+
+### `@approval`
+
+```python
+def approval(fn=None, *, for_tool: str, name: str | None = None)
+```
+
+Wrap a function that asks for or resolves approval for a protected tool. Its return value is
+interpreted with `bool(...)`; the span records `approval_for` and `approval_granted` attributes.
+`ApprovalRequired` consumes one prior granted approval per protected tool call, so approval must
+occur before the action and cannot authorize unlimited later actions.
+
+```python
+@ts.approval(for_tool="send_email")
+def confirm_send() -> bool:
+    return user_clicked_confirm()
+```
+
+### `record_payment()`
+
+```python
+def record_payment(
+    *, amount_usd: float | None = None, protocol: str = "x402",
+    amount: str | int | None = None, asset: str | None = None,
+    network: str | None = None, recipient: str | None = None,
+    payer: str | None = None, success: bool = True,
+    transaction: str | None = None,
+) -> Span
+```
+
+Record a payment result as a custom span inside the current trace. TokenSurf does not wrap a
+specific payment client: call this after your x402 or other payment client returns its settlement
+result.
+
+```python
+ts.record_payment(
+    amount="25000",              # protocol-native amount or base units
+    amount_usd=0.025,            # explicit conversion supplied by your app
+    asset="USDC",
+    network="eip155:8453",
+    recipient="0xmerchant",
+    success=True,
+    transaction="0x...",
+)
+```
+
+`amount` and `amount_usd` are deliberately separate. TokenSurf never guesses a USD conversion
+for a native amount, so unlike assets are not silently added. A successful payment with
+`amount_usd` also sets the span's generic `cost` attribute, which means the existing `CostUnder`
+scorer includes it. Failed attempts remain visible but do not count as spent money.
+
+Do not record payment signatures, authorization headers, private keys, or other secrets. Traces
+can be rendered in the dashboard or exported.
 
 ### `current_trace()`
 

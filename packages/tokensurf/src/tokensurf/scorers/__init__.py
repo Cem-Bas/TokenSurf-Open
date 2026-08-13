@@ -8,8 +8,14 @@ from tokensurf.scorers.deterministic import (
     Regex,
     ToolCalled,
 )
+from tokensurf.scorers.economics import (
+    PaymentCostUnder,
+    PaymentCountAtMost,
+    PaymentRecipientsAllowed,
+)
 from tokensurf.scorers.llm import LiteLLMClient, LLMClient, LLMJudge, LLMResponse
 from tokensurf.scorers.reference import EmbeddingSimilarity
+from tokensurf.scorers.security import ApprovalRequired, ForbiddenToolCalled, NoCanaryLeak
 from tokensurf.scorers.trajectory import (
     NoLoops,
     Recovery,
@@ -33,8 +39,14 @@ __all__ = [
     "LatencyUnder",
     "CostUnder",
     "ToolCalled",
+    "PaymentCostUnder",
+    "PaymentCountAtMost",
+    "PaymentRecipientsAllowed",
     "LLMJudge",
     "EmbeddingSimilarity",
+    "ForbiddenToolCalled",
+    "NoCanaryLeak",
+    "ApprovalRequired",
     "ToolSequence",
     "NoLoops",
     "StepBudget",

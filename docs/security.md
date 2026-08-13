@@ -1,5 +1,8 @@
 # Security model
 
+This page covers the security of TokenSurf Server itself. To test an AI agent for forbidden tool
+calls, synthetic canary leakage, and missing approvals, see [Agent security testing](security-testing.md).
+
 TokenSurf Server is the self-hosted collector that receives eval runs from the TokenSurf SDK/CLI
 and serves the dashboard. This page describes the trust boundary and every security mechanism in
 the server, exactly as implemented, plus what you must handle at the deployment layer.

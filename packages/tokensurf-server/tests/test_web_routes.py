@@ -95,7 +95,28 @@ def seeded(db_session: Session) -> dict:
                     "error": None,
                     "start": 0,
                     "end": 120,
-                }
+                },
+                {
+                    "type": "custom",
+                    "name": "payment.x402",
+                    "input": None,
+                    "output": {"protocol": "x402", "success": True},
+                    "error": None,
+                    "start": 121,
+                    "end": 121,
+                    "attributes": {
+                        "payment.recorded": True,
+                        "payment.protocol": "x402",
+                        "payment.amount_usd": 0.025,
+                        "payment.amount": "25000",
+                        "payment.asset": "USDC",
+                        "payment.network": "eip155:8453",
+                        "payment.recipient": "0xmerchant",
+                        "payment.success": True,
+                        "payment.transaction": "0xtransaction",
+                        "cost": 0.025,
+                    },
+                },
             ]
         },
     )
@@ -168,18 +189,39 @@ def test_scorers_page_requires_login(client, seeded) -> None:
     assert resp.headers["location"] == "/login"
 
 
+def test_economics_page_requires_login(client, seeded) -> None:
+    resp = client.get("/economics", follow_redirects=False)
+    assert resp.status_code == 303
+    assert resp.headers["location"] == "/login"
+
+
 def test_settings_page_requires_login(client, seeded) -> None:
     resp = client.get("/settings", follow_redirects=False)
     assert resp.status_code == 303
 
 
-def test_scorers_page_lists_families(client, seeded) -> None:
+def test_scorers_page_shows_performance_dashboard(client, seeded) -> None:
     cookie = _authed_cookie(client)
     resp = client.get("/scorers", cookies={"ts_session": cookie})
     assert resp.status_code == 200
-    assert "LLMJudge" in resp.text
-    assert "ToolSequence" in resp.text
-    assert "EmbeddingSimilarity" in resp.text
+    assert "Scorer health" in resp.text
+    assert "accuracy" in resp.text
+    assert "relevance" in resp.text
+    assert "50.0%" in resp.text
+    assert "Recent problems" in resp.text
+    assert f"/projects/test-proj/runs/{seeded['run'].id}" in resp.text
+    assert "LLM-judge" not in resp.text
+
+
+def test_economics_page_shows_payment_dashboard(client, seeded) -> None:
+    cookie = _authed_cookie(client)
+    resp = client.get("/economics", cookies={"ts_session": cookie})
+    assert resp.status_code == 200
+    assert "Economics" in resp.text
+    assert "$0.0250" in resp.text
+    assert "0xmerchant" in resp.text
+    assert f"/projects/test-proj/runs/{seeded['run'].id}" in resp.text
+    assert "Record a payment" not in resp.text
 
 
 def test_settings_page_renders(client, seeded) -> None:
@@ -197,7 +239,10 @@ def test_sidebar_nav_present_when_authenticated(client, seeded) -> None:
     assert resp.status_code == 200
     assert "sidebar" in resp.text
     assert 'href="/scorers"' in resp.text
+    assert 'href="/economics"' in resp.text
     assert 'href="/settings"' in resp.text
+    assert 'href="https://tokensurf.io/docs"' in resp.text
+    assert 'target="_blank"' in resp.text
 
 
 def test_runs_page_requires_login(client, seeded) -> None:
@@ -223,12 +268,11 @@ def test_runs_page_gate_filter_accepted(client, seeded) -> None:
     assert 'value="failed"' in resp.text
 
 
-def test_docs_page_renders(client, seeded) -> None:
+def test_docs_page_redirects_to_full_documentation(client, seeded) -> None:
     cookie = _authed_cookie(client)
     resp = client.get("/docs", cookies={"ts_session": cookie})
-    assert resp.status_code == 200
-    assert "@ts.track" in resp.text
-    assert "tokensurf eval run" in resp.text
+    assert resp.status_code == 302
+    assert resp.headers["location"] == "https://tokensurf.io/docs"
 
 
 def test_unauthenticated_root_redirects_to_login(client, seeded) -> None:

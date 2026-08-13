@@ -10,7 +10,7 @@
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 ![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)
 
-[Quickstart](docs/quickstart.md) · [Scorers](docs/scorers.md) · [SDK](docs/sdk.md) · [Self-hosting](docs/self-hosting.md) · [Security model](docs/security.md)
+[Quickstart](docs/quickstart.md) · [Scorers](docs/scorers.md) · [Economics](docs/economics.md) · [SDK](docs/sdk.md) · [Self-hosting](docs/self-hosting.md) · [Security model](docs/security.md)
 
 *Pre-1.0 — not yet on PyPI; install from source.*
 
@@ -23,7 +23,7 @@ quality drops with **no failing test to catch it**. TokenSurf gives your agents 
 the rest of your code already has:
 
 - a **capture SDK** records each agent run as a trace,
-- **14 scorers** grade traces from 0.0 to 1.0,
+- **20 scorers** grade traces from 0.0 to 1.0, including security and economics invariants,
 - an **offline eval harness** turns datasets of cases into pass/fail verdicts you enforce in CI,
 - an optional **self-hosted server** adds a dashboard, quality gates, and alerts.
 
@@ -80,7 +80,7 @@ whole agent runs on yours.
 
 - **Grade the whole run, not just the final answer.** Trajectory scorers check tool ordering,
   loops, step budgets, task completion, and error recovery across the entire multi-step run.
-- **Deterministic first, LLM-judge when you need it.** Seven scorers are pure code — no model
+- **Deterministic first, LLM-judge when you need it.** Ten scorers are pure code — no model
   call, no flakiness; `LLMJudge` and `EmbeddingSimilarity` cover the fuzzy cases.
 - **Capture that can never break your agent.** The `@track` decorator wraps your functions — it
   never proxies your model traffic, and trace writes are best-effort: a failed write can never
@@ -96,6 +96,7 @@ whole agent runs on yours.
 | Family | Scorers | Model call |
 |--------|---------|------------|
 | Deterministic | `ExactMatch`, `Contains`, `Regex`, `JSONSchemaValid`, `LatencyUnder`, `CostUnder`, `ToolCalled` | None — code-based, reproducible, free |
+| Security | `ForbiddenToolCalled`, `NoCanaryLeak`, `ApprovalRequired` | None — deterministic checks over tool calls and outputs |
 | LLM judge | `LLMJudge` | Yes — grades against your criteria, provider-agnostic via litellm |
 | Reference-based | `EmbeddingSimilarity` | Embeddings — cosine similarity vs. `case.expected` |
 | Agent trajectory | `ToolSequence`, `NoLoops`, `StepBudget`, `TaskCompletion`, `Recovery` | Only `TaskCompletion` (delegates to an `LLMJudge`) |
@@ -103,13 +104,36 @@ whole agent runs on yours.
 Every score is normalized to 0.0–1.0, and scorer failures never abort a run — they surface as
 errored results. You can also [write your own scorer](docs/scorers.md).
 
+Security checks use the same trace and eval flow. Decorate tool and approval functions, then add
+the security scorers you need:
+
+```python
+@ts.tool
+def send_email(body: str) -> str:
+    ...
+
+@ts.approval(for_tool="send_email")
+def confirm_send() -> bool:
+    return True
+
+report = ts.evaluate(
+    task=my_agent,
+    data=attack_cases,
+    scorers=[
+        ts.ForbiddenToolCalled("shell"),
+        ts.NoCanaryLeak("TS_CANARY_test-only"),
+        ts.ApprovalRequired("send_email"),
+    ],
+)
+```
+
 ## How it fits together
 
 ```text
  your agent code           offline eval (local or CI)      self-hosted, optional
 +-----------------+ traces +-----------------------+  push  +------------------------+
 | capture SDK     |------->| eval harness          |------->| TokenSurf Server       |
-| @track / span() |        | evaluate() + scorers  | HTTPS  | dashboard: runs/trends |
+| decorators/spans|        | evaluate() + scorers  | HTTPS  | dashboard: runs/trends |
 +-----------------+        | tokensurf eval run    | + key  | quality gates          |
                            +-----------------------+        | Slack/webhook/email    |
                                      ^                      | encrypted judge keys   |
@@ -203,8 +227,9 @@ with the scorer breakdown and per-case results.*
 | --- | --- |
 | [What is TokenSurf](docs/index.md) | Overview, architecture, and how the pieces fit together |
 | [Quickstart](docs/quickstart.md) | Fresh clone to a scored eval, then pushing runs to a server |
-| [SDK reference](docs/sdk.md) | `@track`, `span()`, sinks, `Dataset`, `evaluate()`, `assert_eval` |
-| [Scorers](docs/scorers.md) | The 14 built-in scorers in four families, and writing your own |
+| [SDK reference](docs/sdk.md) | Decorators, spans, sinks, `Dataset`, `evaluate()`, `assert_eval` |
+| [Scorers](docs/scorers.md) | The 20 built-in scorers in six families, and writing your own |
+| [Economics](docs/economics.md) | Agent payment capture, x402-oriented budgets, and cost tracking |
 | [CLI reference](docs/cli.md) | `tokensurf init` / `eval run` / `eval report`; `tokensurf-server` admin |
 | [Self-hosting](docs/self-hosting.md) | Compose or manual install, setup wizard, production setup |
 | [Gates & alerts](docs/quality-gates.md) | Per-project quality gates; Slack/webhook/email alerts |
